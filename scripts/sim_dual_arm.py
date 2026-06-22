@@ -6,6 +6,7 @@ import rerun as rr
 import numpy as np
 import time
 import trimesh
+import gc
 
 URDF_PATH = "/home/moos/dev_ws/dual_arms/urdf/dual_openarm.xml"
 MESH_DIR  = "/home/moos/dev_ws/dual_arms/meshes/"
@@ -35,7 +36,8 @@ def run_sim():
     renderer_rw    = mujoco.Renderer(model, height=WRIST_H, width=WRIST_W)
 
     rr.init("OpenArm_WowRobo_V4", spawn=False)
-    server_uri = rr.serve_grpc(grpc_port=9876)
+    # server_memory_limit: 서버 버퍼 상한 설정 (초과 시 오래된 데이터 자동 제거)
+    server_uri = rr.serve_grpc(grpc_port=9876, server_memory_limit="512MB")
     rr.serve_web_viewer(web_port=9090, connect_to=server_uri)
     print("Dual-arm sim started (EGL GPU rendering)")
 
@@ -142,6 +144,7 @@ def run_sim():
         print(f"  Camera '{cam_name}': id={cid}")
 
     # --- 메인 루프 ---
+    CAM_RENDER_EVERY = 3  # 카메라는 3프레임마다 1회 렌더 (약 10fps)
     start_time = time.time()
     frame = 0
     while True:
@@ -163,6 +166,9 @@ def run_sim():
 
         mujoco.mj_kinematics(model, data)
 
+        # 시간 인덱스 설정: 프레임 시퀀스로 덮어쓰기 → 메모리 누적 방지
+        rr.set_time("sim", sequence=frame)
+
         rr.log("status/sweep", rr.TextDocument(
             f"[{item_idx+1}/{len(sweep_items)}] {label}\n"
             f"qpos = {target:+.3f}   range = [{lo:+.3f}, {hi:+.3f}]"
@@ -179,22 +185,33 @@ def run_sim():
                    rr.Transform3D(translation=pos,
                                   rotation=rr.Quaternion(xyzw=[quat[1], quat[2], quat[3], quat[0]])))
 
-        # 위치 계산 (물리력 없음, gravity=0이므로 자세 변형 없음)
-        mujoco.mj_fwdPosition(model, data)
+        # GPU EGL 카메라 렌더링 (CAM_RENDER_EVERY 프레임마다 1회)
+        if frame % CAM_RENDER_EVERY == 0:
+            mujoco.mj_fwdPosition(model, data)
 
-        # GPU EGL 카메라 렌더링
+            renderer_top.update_scene(data, camera="cam_top")
+            img = renderer_top.render()
+            rr.log("cameras/top", rr.Image(img))
+            del img
 
-        renderer_top.update_scene(data, camera="cam_top")
-        rr.log("cameras/top", rr.Image(renderer_top.render()))
+            renderer_front.update_scene(data, camera="cam_front")
+            img = renderer_front.render()
+            rr.log("cameras/front", rr.Image(img))
+            del img
 
-        renderer_front.update_scene(data, camera="cam_front")
-        rr.log("cameras/front", rr.Image(renderer_front.render()))
+            renderer_lw.update_scene(data, camera="cam_left_wrist")
+            img = renderer_lw.render()
+            rr.log("cameras/left_wrist", rr.Image(img))
+            del img
 
-        renderer_lw.update_scene(data, camera="cam_left_wrist")
-        rr.log("cameras/left_wrist", rr.Image(renderer_lw.render()))
+            renderer_rw.update_scene(data, camera="cam_right_wrist")
+            img = renderer_rw.render()
+            rr.log("cameras/right_wrist", rr.Image(img))
+            del img
 
-        renderer_rw.update_scene(data, camera="cam_right_wrist")
-        rr.log("cameras/right_wrist", rr.Image(renderer_rw.render()))
+        # 300프레임마다 GC 강제 실행
+        if frame % 300 == 0:
+            gc.collect()
 
         frame += 1
         if frame % 30 == 0:
