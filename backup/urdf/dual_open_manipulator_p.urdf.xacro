@@ -1,0 +1,142 @@
+<?xml version="1.0"?>
+<robot name="dual_open_manipulator_p" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- Base Link -->
+  <link name="world"/>
+
+  <link name="base_plate">
+    <visual>
+      <geometry>
+        <box size="0.5 1.0 0.02"/>
+      </geometry>
+      <material name="grey">
+        <color rgba="0.5 0.5 0.5 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.5 1.0 0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="world_to_base" type="fixed">
+    <parent link="world"/>
+    <child link="base_plate"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Macro for OpenManipulator-P Arm -->
+  <xacro:macro name="open_manipulator_p" params="prefix parent side">
+    <link name="${prefix}_base_link">
+      <visual>
+        <geometry>
+          <mesh filename="package://open_manipulator_p_description/meshes/link1.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="black">
+          <color rgba="0.1 0.1 0.1 1.0"/>
+        </material>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://open_manipulator_p_description/meshes/link1.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="0.5"/>
+        <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+      </inertial>
+    </link>
+
+    <joint name="${prefix}_base_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${prefix}_base_link"/>
+      <origin xyz="0 ${side * 0.25} 0.01" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${prefix}_link1">
+      <visual>
+        <geometry>
+          <mesh filename="package://open_manipulator_p_description/meshes/link1.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://open_manipulator_p_description/meshes/link1.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="0.4"/>
+        <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+      </inertial>
+    </link>
+    <joint name="${prefix}_joint1" type="revolute">
+      <parent link="${prefix}_base_link"/>
+      <child link="${prefix}_link1"/>
+      <origin xyz="0 0 0.126" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-3.14159" upper="3.14159" effort="100" velocity="1.0"/>
+    </joint>
+
+    <link name="${prefix}_link2"/>
+    <joint name="${prefix}_joint2" type="revolute">
+      <parent link="${prefix}_link1"/>
+      <child link="${prefix}_link2"/>
+      <origin xyz="0 0 0.033" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="-1.5708" upper="1.5708" effort="100" velocity="1.0"/>
+    </joint>
+
+    <link name="${prefix}_link3"/>
+    <joint name="${prefix}_joint3" type="revolute">
+      <parent link="${prefix}_link2"/>
+      <child link="${prefix}_link3"/>
+      <origin xyz="0 0 0.264" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="-1.5708" upper="2.3562" effort="100" velocity="1.0"/>
+    </joint>
+
+    <link name="${prefix}_link4"/>
+    <joint name="${prefix}_joint4" type="revolute">
+      <parent link="${prefix}_link3"/>
+      <child link="${prefix}_link4"/>
+      <origin xyz="0 0 0.052" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-3.14159" upper="3.14159" effort="100" velocity="1.0"/>
+    </joint>
+
+    <link name="${prefix}_link5"/>
+    <joint name="${prefix}_joint5" type="revolute">
+      <parent link="${prefix}_link4"/>
+      <child link="${prefix}_link5"/>
+      <origin xyz="0 0 0.211" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="-1.5708" upper="1.5708" effort="100" velocity="1.0"/>
+    </joint>
+
+    <link name="${prefix}_link6"/>
+    <joint name="${prefix}_joint6" type="revolute">
+      <parent link="${prefix}_link5"/>
+      <child link="${prefix}_link6"/>
+      <origin xyz="0 0 0.052" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-3.14159" upper="3.14159" effort="100" velocity="1.0"/>
+    </joint>
+
+    <!-- End Effector / Gripper Placeholder -->
+    <link name="${prefix}_gripper_link"/>
+    <joint name="${prefix}_gripper_joint" type="fixed">
+      <parent link="${prefix}_link6"/>
+      <child link="${prefix}_gripper_link"/>
+      <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+  <!-- Instantiate Left Arm (side=1) -->
+  <xacro:open_manipulator_p prefix="left" parent="base_plate" side="1"/>
+
+  <!-- Instantiate Right Arm (side=-1) -->
+  <xacro:open_manipulator_p prefix="right" parent="base_plate" side="-1"/>
+
+</robot>

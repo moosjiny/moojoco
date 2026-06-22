@@ -1,0 +1,37 @@
+robot:
+  name: dual_openarm
+  arms:
+    left_follower:
+      type: openarm_follower
+      port: can0
+      side: left
+      can_interface: socketcan
+      use_can_fd: true
+      can_bitrate: 1000000
+      can_data_bitrate: 5000000
+    right_follower:
+      type: openarm_follower
+      port: can1
+      side: right
+      can_interface: socketcan
+      use_can_fd: true
+      can_bitrate: 1000000
+      can_data_bitrate: 5000000
+    left_leader:
+      type: dynamixel # Assuming Leader arms might still be Dynamixel (ALOHA style)
+      port: /dev/ttyUSB0
+      baudrate: 1000000
+    right_leader:
+      type: dynamixel
+      port: /dev/ttyUSB1
+      baudrate: 1000000
+  cameras:
+    top:
+      type: opencv
+      index: 0
+    left_wrist:
+      type: opencv
+      index: 1
+    right_wrist:
+      type: opencv
+      index: 2

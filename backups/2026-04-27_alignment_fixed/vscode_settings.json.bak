@@ -1,0 +1,8 @@
+{
+    "python.defaultInterpreterPath": "/home/addinedu/dev_ws/dual_arms/venv/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.analysis.extraPaths": [
+        "./dashboard",
+        "./scripts"
+    ]
+}
