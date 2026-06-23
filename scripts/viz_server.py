@@ -823,10 +823,10 @@ if __name__ == "__main__":
     use_https = os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE)
 
     print(f"Moojoco 3D Viz Server")
-    print(f"  HTTP  → http://100.125.27.70:{PORT}/viz/thesis-3d")
+    print(f"  HTTP  → http://hb5u.hyperbook.com:{PORT}/viz/thesis-3d")
     if use_https:
+        print(f"  HTTPS → https://hb5u.hyperbook.com:{HTTPS_PORT}/viz/thesis-3d")
         print(f"  HTTPS → https://hb5u.tail35af02.ts.net:{HTTPS_PORT}/viz/thesis-3d")
-        print(f"  HTTPS → https://100.125.27.70:{HTTPS_PORT}/viz/thesis-3d")
 
     def run_https():
         uvicorn.run(app, host="0.0.0.0", port=HTTPS_PORT,
