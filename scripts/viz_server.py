@@ -337,6 +337,7 @@ const PANEL  = document.getElementById('panel');
 const PBODY  = document.getElementById('panel-body');
 
 function closePanel() { PANEL.classList.remove('open'); }
+window.closePanel = closePanel;  // HTML onclick에서 호출 가능하도록
 
 function openPanel(d) {
   const THESIS = 'https://thesis.hyperbook.com/papers/';
@@ -819,27 +820,21 @@ renderer.domElement.addEventListener('pointerup', e => {
     dragNode = null;
     groupDragOffsets = null;
     didDrag = false;
+    if (wasDrag) savePositions();
+  }
+});
 
-    if (!wasDrag) {
-      // 클릭 판정: 이동 없이 손을 뗀 경우
-      const dx = e.clientX - pointerDownPos.x;
-      const dy = e.clientY - pointerDownPos.y;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      const elapsed = Date.now() - pointerDownTime;
-      if (dist < 8 && elapsed < 400) {
-        // 클릭된 노드 재탐색
-        const mx = (pointerDownPos.x / innerWidth) * 2 - 1;
-        const my = -(pointerDownPos.y / innerHeight) * 2 + 1;
-        raycaster.setFromCamera(new THREE.Vector2(mx, my), camera);
-        const hits = raycaster.intersectObjects(getMeshes());
-        if (hits.length) {
-          const d = hits[0].object.userData;
-          openPanel(d);
-        }
-        return;
-      }
-    }
-    savePositions();  // 실제 드래그 후 위치 저장
+// 클릭 → 패널 열기 (드래그와 구분은 브라우저 click 이벤트가 담당)
+renderer.domElement.addEventListener('click', e => {
+  if (didDrag) return;  // 드래그 후 발생하는 click은 무시
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(getMeshes());
+  if (hits.length) {
+    openPanel(hits[0].object.userData);
+  } else {
+    closePanel();
   }
 });
 
