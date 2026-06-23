@@ -272,9 +272,29 @@ _HTML = """<!DOCTYPE html>
              pointer-events: none; display: none; z-index: 50; }
   #hint { position: fixed; bottom: 28px; left: 14px; font-size: 0.65rem; color: #444; }
   #tooltip { position: fixed; background: #1e2130dd; border: 1px solid #444; border-radius: 8px;
-             padding: 10px 14px; font-size: 0.75rem; pointer-events: none; opacity: 0;
-             max-width: 280px; line-height: 1.6; z-index: 100; transition: opacity 0.15s; }
-  #tooltip h3 { color: #a0c4ff; margin-bottom: 4px; }
+             padding: 8px 12px; font-size: 0.72rem; pointer-events: none; opacity: 0;
+             max-width: 240px; line-height: 1.5; z-index: 100; transition: opacity 0.15s; }
+  #tooltip h3 { color: #a0c4ff; margin-bottom: 2px; font-size: 0.75rem; }
+  /* ── 좌측 사이드 패널 ── */
+  #panel { position: fixed; top: 0; left: -340px; width: 320px; height: 100vh;
+           background: #12151fee; border-right: 1px solid #2a3050;
+           overflow-y: auto; z-index: 200; transition: left 0.25s ease;
+           padding: 16px 14px; }
+  #panel.open { left: 0; }
+  #panel-close { position: absolute; top: 10px; right: 12px; background: none; border: none;
+                 color: #666; font-size: 1.1rem; cursor: pointer; }
+  #panel-close:hover { color: #fff; }
+  #panel h2 { color: #a0c4ff; font-size: 0.85rem; margin: 0 28px 4px 0; line-height: 1.4; }
+  #panel .meta { color: #666; font-size: 0.68rem; margin-bottom: 12px; }
+  #panel .paper-item { padding: 8px 10px; margin-bottom: 6px; border-radius: 6px;
+                       background: #1e2438; border: 1px solid #2a3050; }
+  #panel .paper-item a { color: #e0e0e0; text-decoration: none; font-size: 0.75rem; line-height: 1.4; display: block; }
+  #panel .paper-item a:hover { color: #a0c4ff; }
+  #panel .paper-meta { color: #555; font-size: 0.65rem; margin-top: 3px; }
+  #panel .open-btn { display: inline-block; margin-top: 6px; padding: 3px 10px;
+                     background: #1e3a6a; border: 1px solid #3a5a9a; border-radius: 4px;
+                     color: #69b4ff; font-size: 0.68rem; text-decoration: none; }
+  #panel .open-btn:hover { background: #2a4a8a; }
   canvas { display: block; }
 </style>
 </head>
@@ -294,9 +314,13 @@ _HTML = """<!DOCTYPE html>
   <span class="lc" style="background:#81d4fa"></span>Mojo<br>
   <span class="lc" style="background:#607d8b"></span>Unknown<br>
 </div>
+<div id="panel">
+  <button id="panel-close" onclick="closePanel()">✕</button>
+  <div id="panel-body"></div>
+</div>
 <div id="selRect"></div>
 <div id="status">로딩 중...</div>
-<div id="hint">Shift+드래그: 영역 선택 · 선택 후 드래그: 그룹 이동 · 빈 곳 클릭: 선택 해제</div>
+<div id="hint">Shift+드래그: 영역 선택 · 선택 후 드래그: 그룹 이동 · 노드 클릭: 논문 목록</div>
 <div id="tooltip"></div>
 
 <script type="importmap">
@@ -309,6 +333,45 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const STATUS = document.getElementById('status');
 const TIP    = document.getElementById('tooltip');
+const PANEL  = document.getElementById('panel');
+const PBODY  = document.getElementById('panel-body');
+
+function closePanel() { PANEL.classList.remove('open'); }
+
+function openPanel(d) {
+  const THESIS = 'https://thesis.hyperbook.com/papers/';
+  let html = '';
+  if (currentViewType === 'network') {
+    // 논문 노드 — 단일 논문 상세
+    const url = THESIS + d.id;
+    html = `
+      <h2>${d.label || d.id}</h2>
+      <div class="meta">${d.author || ''}</div>
+      <div class="paper-item">
+        <a href="${url}" target="_blank">${d.label || d.id}</a>
+        <div class="paper-meta">${d.id}</div>
+        <a class="open-btn" href="${url}" target="_blank">논문 열기 →</a>
+      </div>`;
+  } else {
+    // 키워드 노드 — 관련 논문 목록
+    const papers = d.papers || [];
+    const items = papers.map(p => {
+      const title = p.title || p;
+      const slug  = p.slug  || '';
+      const url   = slug ? THESIS + slug : '';
+      return `<div class="paper-item">
+        <a href="${url || '#'}" target="_blank">${title}</a>
+        ${slug ? `<a class="open-btn" href="${url}" target="_blank">열기 →</a>` : ''}
+      </div>`;
+    }).join('');
+    html = `
+      <h2>${d.label || d.id}</h2>
+      <div class="meta">관련 논문 ${papers.length}건</div>
+      ${items || '<div style="color:#555;font-size:0.72rem">논문 없음</div>'}`;
+  }
+  PBODY.innerHTML = html;
+  PANEL.classList.add('open');
+}
 
 // ── Scene setup ──────────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -719,8 +782,7 @@ renderer.domElement.addEventListener('pointermove', e => {
     const d = hits[0].object.userData;
     let papersHtml = '';
     if (currentViewType === 'network') {
-      // 논문 노드: 클릭 안내
-      papersHtml = `<div style="color:#69d2e7;font-size:0.68rem;margin-top:4px">🔗 클릭하면 논문 열기</div>`;
+      papersHtml = `<div style="color:#69d2e7;font-size:0.68rem;margin-top:4px">클릭 → 좌측 패널</div>`;
     } else {
       // 키워드 노드: 관련 논문 클릭 링크
       papersHtml = (d.papers || []).map(p => {
@@ -772,10 +834,7 @@ renderer.domElement.addEventListener('pointerup', e => {
         const hits = raycaster.intersectObjects(getMeshes());
         if (hits.length) {
           const d = hits[0].object.userData;
-          // 논문 네트워크 뷰: slug → thesis 직접 열기
-          if (currentViewType === 'network' && d.id) {
-            window.open(`https://thesis.hyperbook.com/papers/${d.id}`, '_blank');
-          }
+          openPanel(d);
         }
         return;
       }
