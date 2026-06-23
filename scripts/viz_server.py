@@ -258,19 +258,19 @@ _HTML = """<!DOCTYPE html>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #0a0c14; color: #e0e0e0; font-family: 'JetBrains Mono', monospace; overflow: hidden; }
-  #ui { position: fixed; top: 10px; left: 14px; z-index: 10; }
+  #ui { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10; text-align: center; }
   #ui h1 { font-size: 0.85rem; color: #a0c4ff; margin-bottom: 8px; }
   .btn { padding: 4px 12px; border-radius: 4px; border: 1px solid #444; background: #1e2130;
          color: #aaa; font-size: 0.72rem; cursor: pointer; margin-right: 6px; }
   .btn:hover { background: #2a3050; color: #fff; }
   .btn.active { background: #2a3a6a; border-color: #64b5f6; color: #a0c4ff; }
-  #status { position: fixed; bottom: 12px; left: 14px; font-size: 0.68rem; color: #555; }
+  #status { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 0.68rem; color: #555; white-space: nowrap; }
   #legend { position: fixed; top: 10px; right: 14px; font-size: 0.68rem; line-height: 1.8; display: none; }
   #legend.show { display: block; }
   .lc { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
   #selRect { position: fixed; border: 2px dashed #a0c4ff; background: rgba(100,180,255,0.08);
              pointer-events: none; display: none; z-index: 50; }
-  #hint { position: fixed; bottom: 28px; left: 14px; font-size: 0.65rem; color: #444; }
+  #hint { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); font-size: 0.65rem; color: #444; white-space: nowrap; }
   #tooltip { position: fixed; background: #1e2130dd; border: 1px solid #444; border-radius: 8px;
              padding: 8px 12px; font-size: 0.72rem; pointer-events: none; opacity: 0;
              max-width: 240px; line-height: 1.5; z-index: 100; transition: opacity 0.15s; }
