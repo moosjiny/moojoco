@@ -718,7 +718,7 @@ renderer.domElement.addEventListener('pointermove', e => {
   if (hits.length) {
     const d = hits[0].object.userData;
     let papersHtml = '';
-    if (d.type === 'network') {
+    if (currentViewType === 'network') {
       // 논문 노드: 클릭 안내
       papersHtml = `<div style="color:#69d2e7;font-size:0.68rem;margin-top:4px">🔗 클릭하면 논문 열기</div>`;
     } else {
@@ -773,7 +773,7 @@ renderer.domElement.addEventListener('pointerup', e => {
         if (hits.length) {
           const d = hits[0].object.userData;
           // 논문 네트워크 뷰: slug → thesis 직접 열기
-          if (d.type === 'network' && d.id) {
+          if (currentViewType === 'network' && d.id) {
             window.open(`https://thesis.hyperbook.com/papers/${d.id}`, '_blank');
           }
         }
