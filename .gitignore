@@ -1,4 +1,5 @@
 venv/
+certs/
 __pycache__/
 *.pyc
 *.pyo

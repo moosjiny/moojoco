@@ -16,6 +16,9 @@ import uvicorn
 
 # ── 설정 ──────────────────────────────────────────────────────────────
 PORT          = 8891
+HTTPS_PORT    = 8443
+CERT_FILE     = "/home/moos/dev_ws/dual_arms/certs/cert.pem"
+KEY_FILE      = "/home/moos/dev_ws/dual_arms/certs/key.pem"
 REDIS_HOST    = "100.102.81.13"
 REDIS_PORT    = 6379
 REDIS_PASS    = os.environ.get("REDIS_PASS", "")
@@ -815,8 +818,23 @@ loadView('keywords', null);
 """
 
 if __name__ == "__main__":
-    print(f"Moojoco 3D Viz Server starting on port {PORT}")
-    print(f"  http://100.125.27.70:{PORT}/viz/thesis-3d")
-    print(f"  http://100.125.27.70:{PORT}/health")
-    print(f"  http://100.125.27.70:{PORT}/layout?type=keywords")
+    import threading, os
+
+    use_https = os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE)
+
+    print(f"Moojoco 3D Viz Server")
+    print(f"  HTTP  → http://100.125.27.70:{PORT}/viz/thesis-3d")
+    if use_https:
+        print(f"  HTTPS → https://hb5u.tail35af02.ts.net:{HTTPS_PORT}/viz/thesis-3d")
+        print(f"  HTTPS → https://100.125.27.70:{HTTPS_PORT}/viz/thesis-3d")
+
+    def run_https():
+        uvicorn.run(app, host="0.0.0.0", port=HTTPS_PORT,
+                    ssl_certfile=CERT_FILE, ssl_keyfile=KEY_FILE,
+                    log_level="warning")
+
+    if use_https:
+        t = threading.Thread(target=run_https, daemon=True)
+        t.start()
+
     uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="warning")
