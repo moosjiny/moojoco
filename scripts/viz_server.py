@@ -218,7 +218,7 @@ def _layout_keywords(papers):
         for t in parsed:
             kw_freq[t["en"]] = kw_freq.get(t["en"], 0) + 1
             kw_label[t["en"]] = t["label"]  # 한글(영문) 형식
-            kw_papers.setdefault(t["en"], []).append(p.get("title", ""))
+            kw_papers.setdefault(t["en"], []).append({"title": p.get("title", ""), "slug": p.get("slug", "")})
         for i in range(len(ens)):
             for j in range(i + 1, len(ens)):
                 key = "|||".join(sorted([ens[i], ens[j]]))
@@ -534,7 +534,10 @@ function makeLabel(text, color) {
 }
 
 // ── 헬퍼 ─────────────────────────────────────────────────────────────
-let dragNode = null;
+let dragNode       = null;
+let didDrag        = false;
+let pointerDownPos = { x: 0, y: 0 };
+let pointerDownTime = 0;
 const dragPlane   = new THREE.Plane();
 const dragOffset  = new THREE.Vector3();
 const planeNormal = new THREE.Vector3();
@@ -649,6 +652,9 @@ renderer.domElement.addEventListener('pointerdown', e => {
   const nodeId = mesh.userData.id;
   autoRotate = false;
   controls.enabled = false;
+  didDrag = false;
+  pointerDownPos  = { x: e.clientX, y: e.clientY };
+  pointerDownTime = Date.now();
 
   // ── 드래그 평면: 카메라 시선 방향 수직, world space 기준 ──
   camera.getWorldDirection(planeNormal);
@@ -700,6 +706,7 @@ renderer.domElement.addEventListener('pointermove', e => {
     } else {
       setNodeByWorldPos(dragNode.mesh, newWorldBase);
     }
+    didDrag = true;
     updateEdges();
     TIP.style.opacity = 0;
     return;
@@ -710,11 +717,26 @@ renderer.domElement.addEventListener('pointermove', e => {
   const hits = raycaster.intersectObjects(getMeshes());
   if (hits.length) {
     const d = hits[0].object.userData;
-    const papers = (d.papers || []).map(p => `<div style="color:#bbb;font-size:0.68rem;padding-left:6px">📄 ${p}</div>`).join('');
+    let papersHtml = '';
+    if (d.type === 'network') {
+      // 논문 노드: 클릭 안내
+      papersHtml = `<div style="color:#69d2e7;font-size:0.68rem;margin-top:4px">🔗 클릭하면 논문 열기</div>`;
+    } else {
+      // 키워드 노드: 관련 논문 클릭 링크
+      papersHtml = (d.papers || []).map(p => {
+        const title = p.title || p;
+        const slug  = p.slug  || '';
+        const url   = slug ? `https://thesis.hyperbook.com/papers/${slug}` : '';
+        return url
+          ? `<div style="padding-left:6px"><a href="${url}" target="_blank"
+               style="color:#a0c4ff;font-size:0.68rem;text-decoration:none">📄 ${title}</a></div>`
+          : `<div style="color:#bbb;font-size:0.68rem;padding-left:6px">📄 ${title}</div>`;
+      }).join('');
+    }
     TIP.style.opacity = 1;
     TIP.style.left = (e.clientX + 14) + 'px';
     TIP.style.top  = Math.min(e.clientY - 10, innerHeight - 200) + 'px';
-    TIP.innerHTML  = `<h3>${d.label || d.id}</h3><div style="color:#888;font-size:0.7rem">빈도: ${d.freq || d.paper_count || 1}</div>${papers}`;
+    TIP.innerHTML  = `<h3>${d.label || d.id}</h3><div style="color:#888;font-size:0.7rem">빈도: ${d.freq || d.paper_count || 1}</div>${papersHtml}`;
   } else {
     TIP.style.opacity = 0;
   }
@@ -731,9 +753,34 @@ renderer.domElement.addEventListener('pointerup', e => {
   }
   if (dragNode) {
     controls.enabled = true;
+    const wasDrag = didDrag;
     dragNode = null;
     groupDragOffsets = null;
-    savePositions();  // 드래그 완료 → 위치 저장
+    didDrag = false;
+
+    if (!wasDrag) {
+      // 클릭 판정: 이동 없이 손을 뗀 경우
+      const dx = e.clientX - pointerDownPos.x;
+      const dy = e.clientY - pointerDownPos.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      const elapsed = Date.now() - pointerDownTime;
+      if (dist < 8 && elapsed < 400) {
+        // 클릭된 노드 재탐색
+        const mx = (pointerDownPos.x / innerWidth) * 2 - 1;
+        const my = -(pointerDownPos.y / innerHeight) * 2 + 1;
+        raycaster.setFromCamera(new THREE.Vector2(mx, my), camera);
+        const hits = raycaster.intersectObjects(getMeshes());
+        if (hits.length) {
+          const d = hits[0].object.userData;
+          // 논문 네트워크 뷰: slug → thesis 직접 열기
+          if (d.type === 'network' && d.id) {
+            window.open(`https://thesis.hyperbook.com/papers/${d.id}`, '_blank');
+          }
+        }
+        return;
+      }
+    }
+    savePositions();  // 실제 드래그 후 위치 저장
   }
 });
 
