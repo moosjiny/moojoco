@@ -104,9 +104,10 @@ def fetch_papers():
 def parse_tag(raw):
     m = TAG_RX_PY.match(raw.strip())
     if m:
-        return {"ko": m.group(1).strip(), "en": m.group(2)}
+        ko, en = m.group(1).strip(), m.group(2)
+        return {"ko": ko, "en": en, "label": f"{ko}({en})"}
     en = __import__("re").sub(r"[^a-z0-9-]", "-", raw.strip().lower()).strip("-") or "unknown"
-    return {"ko": raw.strip(), "en": en}
+    return {"ko": raw.strip(), "en": en, "label": raw.strip()}
 
 
 # ── 3D Force-directed 레이아웃 계산 ───────────────────────────────────
@@ -216,7 +217,7 @@ def _layout_keywords(papers):
         ens = [t["en"] for t in parsed]
         for t in parsed:
             kw_freq[t["en"]] = kw_freq.get(t["en"], 0) + 1
-            kw_label[t["en"]] = t["ko"]
+            kw_label[t["en"]] = t["label"]  # 한글(영문) 형식
             kw_papers.setdefault(t["en"], []).append(p.get("title", ""))
         for i in range(len(ens)):
             for j in range(i + 1, len(ens)):
