@@ -1,0 +1,15 @@
+[Unit]
+Description=Moojoco 3D Thesis Viz Server
+After=network.target nginx.service
+
+[Service]
+Type=simple
+User=moos
+WorkingDirectory=/home/moos/dev_ws/dual_arms
+Environment="REDIS_PASS=gYVxV0116QBmdEJJcMItU1gYN2wAhtz92wJyUgt4W2bzbqPJQd-S6Q"
+ExecStart=/home/moos/venv/dual_arms/bin/python3 scripts/viz_server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
