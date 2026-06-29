@@ -271,6 +271,29 @@ _HTML = """<!DOCTYPE html>
   #selRect { position: fixed; border: 2px dashed #a0c4ff; background: rgba(100,180,255,0.08);
              pointer-events: none; display: none; z-index: 50; }
   #hint { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); font-size: 0.65rem; color: #444; white-space: nowrap; }
+  #ctrl-bar { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; align-items: center; font-size: 0.68rem; color: #666; }
+  .ctrl-row { display: flex; align-items: center; gap: 8px; }
+  .ctrl-row label { white-space: nowrap; }
+  .ctrl-row span { color: #a0c4ff; min-width: 52px; display: inline-block; text-align: left; }
+  .ctrl-slider { -webkit-appearance: none; width: 100px; height: 3px; border-radius: 2px;
+                 background: #2a3050; outline: none; cursor: pointer; }
+  .ctrl-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px;
+                 border-radius: 50%; background: #64b5f6; cursor: pointer; }
+  .ctrl-slider::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%;
+                 background: #64b5f6; cursor: pointer; border: none; }
+  #rot-top { position: fixed; top: 10px; right: 14px; z-index: 10; font-size: 0.68rem; color: #666;
+             display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  #rot-bottom { position: fixed; bottom: 10px; right: 14px; z-index: 10; font-size: 0.68rem; color: #666;
+                display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  .search-row { display: flex; align-items: center; gap: 4px; }
+  .search-input { background: #1e2130; border: 1px solid #2a3050; border-radius: 4px;
+                  color: #e0e0e0; font-size: 0.68rem; padding: 3px 7px; width: 130px; outline: none;
+                  font-family: inherit; }
+  .search-input::placeholder { color: #444; }
+  .search-input.kw:focus { border-color: #00dd88; }
+  .search-input.au:focus { border-color: #ffdd00; }
+  .search-clr { background: none; border: none; color: #555; font-size: 0.75rem; cursor: pointer; padding: 0 2px; }
+  .search-clr:hover { color: #aaa; }
   #tooltip { position: fixed; background: #1e2130dd; border: 1px solid #444; border-radius: 8px;
              padding: 8px 12px; font-size: 0.72rem; pointer-events: none; opacity: 0;
              max-width: 240px; line-height: 1.5; z-index: 100; transition: opacity 0.15s; }
@@ -303,6 +326,42 @@ _HTML = """<!DOCTYPE html>
   <h1>ROOPS Thesis 3D</h1>
   <button class="btn active" onclick="loadView('keywords', this)">키워드</button>
   <button class="btn" onclick="loadView('network', this)">논문 네트워크</button>
+  <div id="ctrl-bar">
+    <div class="ctrl-row">
+      <label>갱신: <span id="refresh-label"></span></label>
+      <input type="range" id="refresh-slider" class="ctrl-slider" min="0" max="6" step="1">
+    </div>
+  </div>
+</div>
+<div id="rot-top">
+  <div class="ctrl-row">
+    <label>X축: <span id="rotx-label"></span></label>
+    <input type="range" id="rotx-slider" class="ctrl-slider" min="0" max="8" step="1">
+  </div>
+  <div class="search-row">
+    <label style="white-space:nowrap;color:#666;font-size:0.68rem;">키워드:</label>
+    <input type="text" id="kw-box" class="search-input kw" placeholder="검색 (초록)">
+    <button class="search-clr" data-target="kw-box">✕</button>
+  </div>
+  <div class="ctrl-row">
+    <label>전체밝기: <span id="scene-bright-label"></span></label>
+    <input type="range" id="scene-bright-slider" class="ctrl-slider" min="0" max="8" step="1">
+  </div>
+</div>
+<div id="rot-bottom">
+  <div class="ctrl-row">
+    <label>Y축: <span id="roty-label"></span></label>
+    <input type="range" id="roty-slider" class="ctrl-slider" min="0" max="8" step="1">
+  </div>
+  <div class="search-row">
+    <label style="white-space:nowrap;color:#666;font-size:0.68rem;">저자:</label>
+    <input type="text" id="au-box" class="search-input au" placeholder="검색 (노란)">
+    <button class="search-clr" data-target="au-box">✕</button>
+  </div>
+  <div class="ctrl-row">
+    <label>선택밝기: <span id="glow-bright-label"></span></label>
+    <input type="range" id="glow-bright-slider" class="ctrl-slider" min="0" max="8" step="1">
+  </div>
 </div>
 <div id="legend">
   <span class="lc" style="background:#ff6b9d"></span>EROS<br>
@@ -330,6 +389,11 @@ _HTML = """<!DOCTYPE html>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const STATUS = document.getElementById('status');
 const TIP    = document.getElementById('tooltip');
@@ -397,10 +461,49 @@ const dir = new THREE.DirectionalLight(0xffffff, 0.8);
 dir.position.set(5, 10, 7);
 scene.add(dir);
 
+// ── Selective Bloom (레이어 기반 선택적 후광) ──────────────────────────
+const BLOOM_LAYER = 1;
+
+// Pass 1: bloom layer만 렌더 → 텍스처로 저장
+const bloomComposer = new EffectComposer(renderer);
+bloomComposer.renderToScreen = false;
+bloomComposer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(innerWidth, innerHeight),
+  1.6,  // strength
+  0.6,  // radius
+  0.0   // threshold (레이어로 제어하므로 0)
+);
+bloomComposer.addPass(bloomPass);
+
+// Pass 2: 전체 씬 렌더 + bloom 텍스처 합성
+const mixPass = new ShaderPass(new THREE.ShaderMaterial({
+  uniforms: {
+    baseTexture:  { value: null },
+    bloomTexture: { value: bloomComposer.renderTarget2.texture }
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D baseTexture;
+    uniform sampler2D bloomTexture;
+    varying vec2 vUv;
+    void main() { gl_FragColor = texture2D(baseTexture, vUv) + texture2D(bloomTexture, vUv); }`
+}), 'baseTexture');
+mixPass.needsSwap = true;
+
+const finalComposer = new EffectComposer(renderer);
+finalComposer.addPass(new RenderPass(scene, camera));
+finalComposer.addPass(mixPass);
+finalComposer.addPass(new OutputPass());
+
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  bloomComposer.setSize(innerWidth, innerHeight);
+  finalComposer.setSize(innerWidth, innerHeight);
 });
 
 // ── Graph state ──────────────────────────────────────────────────────
@@ -408,6 +511,8 @@ let graphGroup = new THREE.Group();
 scene.add(graphGroup);
 let nodeObjects = [];  // { mesh, data }
 let autoRotate = true;
+let rotSpeedX = 0;
+let rotSpeedY = 0.0008;
 let currentViewType = 'keywords';
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -512,22 +617,28 @@ function buildGraph(data) {
   const scale = 3.5;
   const isNetwork = (type === 'network');
 
-  // 엣지 (LineSegments)
-  const linePos = [];
+  // 엣지 (LineSegments — vertexColors로 per-edge 색상 제어)
+  const linePos = [], lineColors = [];
   const idToNode = {};
   nodes.forEach(n => idToNode[n.id] = n);
   edgeData = edges;
+  validEdgeData = [];
+  const EC = new THREE.Color(0x2a3a5a);
   edges.forEach(e => {
     const s = idToNode[e.source], t = idToNode[e.target];
     if (!s || !t) return;
-    linePos.push(s.x * scale, s.y * scale, s.z * scale,
-                 t.x * scale, t.y * scale, t.z * scale);
+    validEdgeData.push(e);
+    linePos.push(s.x*scale, s.y*scale, s.z*scale, t.x*scale, t.y*scale, t.z*scale);
+    lineColors.push(EC.r, EC.g, EC.b, EC.r, EC.g, EC.b);
   });
   if (linePos.length) {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(linePos, 3));
     geo.attributes.position.setUsage(THREE.DynamicDrawUsage);
-    const mat = new THREE.LineBasicMaterial({ color: 0x2a3a5a, transparent: true, opacity: 0.5 });
+    const ca = new THREE.Float32BufferAttribute(lineColors, 3);
+    ca.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('color', ca);
+    const mat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5 });
     edgeLineObj = new THREE.LineSegments(geo, mat);
     graphGroup.add(edgeLineObj);
   }
@@ -565,8 +676,9 @@ function buildGraph(data) {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.scale.setScalar(r);
     mesh.position.set(n.x * scale, n.y * scale, n.z * scale);
+    mesh.layers.enable(BLOOM_LAYER);  // 기본: 모든 노드 발광
     mesh.userData = { ...n, _baseEmissive: 0.25, _pulseOffset: Math.random() * Math.PI * 2,
-                      _renderColor: '#' + color.getHexString() };  // 실제 렌더 색 저장
+                      _renderColor: '#' + color.getHexString(), _origScale: r };  // 실제 렌더 색 저장
     graphGroup.add(mesh);
     nodeObjects.push({ mesh, data: n });
     nodeIdToMesh[n.id] = mesh;
@@ -576,25 +688,47 @@ function buildGraph(data) {
       ? (n.author ? `[${n.author}] ${(n.label||n.id).substring(0,18)}…` : (n.label||n.id))
       : (n.label || n.id);
     const sprite = makeLabel(label, color);
+    const sW = isNetwork ? 2.0 : 1.4;
+    const sH = sprite.userData._multiLine ? sW * (96/256) : sW * (64/256);
     sprite.position.set(n.x * scale, n.y * scale + r + 0.12, n.z * scale);
-    sprite.scale.set(isNetwork ? 2.0 : 1.2, 0.3, 1);
+    sprite.scale.set(sW, sH, 1);
     graphGroup.add(sprite);
     nodeIdToSprite[n.id] = sprite;  // 노드-스프라이트 연결
   });
 }
 
 function makeLabel(text, color) {
+  // "한글(영문)" 형식이면 두 줄로 분리
+  const parenIdx = text.indexOf('(');
+  const isMulti  = parenIdx > 0 && text.endsWith(')');
+  const line1    = isMulti ? text.slice(0, parenIdx).trim() : text;
+  const line2    = isMulti ? text.slice(parenIdx).trim() : null;
+
+  const W = 256, H = isMulti ? 96 : 64;
   const canvas = document.createElement('canvas');
-  canvas.width = 256; canvas.height = 64;
+  canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 256, 64);
-  ctx.font = 'bold 22px sans-serif';
-  ctx.fillStyle = '#' + color.getHexString();
+  ctx.clearRect(0, 0, W, H);
   ctx.textAlign = 'center';
-  ctx.fillText(text, 128, 42);
+
+  if (isMulti) {
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillStyle = '#' + color.getHexString();
+    ctx.fillText(line1, 128, 30);
+    ctx.font = '17px sans-serif';
+    ctx.fillStyle = '#' + color.getHexString() + 'bb';
+    ctx.fillText(line2, 128, 62);
+  } else {
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillStyle = '#' + color.getHexString();
+    ctx.fillText(text, 128, 42);
+  }
+
   const tex = new THREE.CanvasTexture(canvas);
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
-  return new THREE.Sprite(mat);
+  const sprite = new THREE.Sprite(mat);
+  sprite.userData._multiLine = isMulti;
+  return sprite;
 }
 
 // ── 헬퍼 ─────────────────────────────────────────────────────────────
@@ -816,6 +950,7 @@ renderer.domElement.addEventListener('pointerup', e => {
   }
   if (dragNode) {
     controls.enabled = true;
+    autoRotate = true;
     const wasDrag = didDrag;
     dragNode = null;
     groupDragOffsets = null;
@@ -841,6 +976,7 @@ renderer.domElement.addEventListener('click', e => {
 // 엣지 위치 동적 업데이트
 let edgeLineObj = null;
 let edgeData = [];
+let validEdgeData = [];
 let nodeIdToMesh = {};
 
 function updateEdges() {
@@ -861,7 +997,10 @@ function updateEdges() {
 (function animate() {
   requestAnimationFrame(animate);
   controls.update();
-  if (autoRotate) graphGroup.rotation.y += 0.0008;
+  if (autoRotate) {
+    graphGroup.rotation.x += rotSpeedX;
+    graphGroup.rotation.y += rotSpeedY;
+  }
 
   // 저자별 블링크 속도 (논문 네트워크 뷰)
   const AUTHOR_BLINK = {
@@ -909,8 +1048,163 @@ function updateEdges() {
     }
   });
 
-  renderer.render(scene, camera);
+  // Selective bloom: bloom layer만 렌더 후 합성
+  camera.layers.set(BLOOM_LAYER);
+  bloomComposer.render();
+  camera.layers.enableAll();
+  finalComposer.render();
 })();
+
+// ── 갱신 간격 슬라이더 ───────────────────────────────────────────────
+const REFRESH_STEPS  = [10, 30, 60, 300, 600, 1800, 3600];
+const REFRESH_LABELS = ['10초', '30초', '1분', '5분', '10분', '30분', '1시간'];
+let refreshTimer = null;
+
+function setRefreshInterval(idx) {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => loadView(currentViewType, null), REFRESH_STEPS[idx] * 1000);
+  document.getElementById('refresh-label').textContent = REFRESH_LABELS[idx];
+  localStorage.setItem('refreshStep', idx);
+}
+
+const refreshSlider = document.getElementById('refresh-slider');
+const savedRefreshStep = Math.min(6, Math.max(0, parseInt(localStorage.getItem('refreshStep') ?? '2')));
+refreshSlider.value = savedRefreshStep;
+setRefreshInterval(savedRefreshStep);
+refreshSlider.addEventListener('input', e => setRefreshInterval(parseInt(e.target.value)));
+
+// ── 밝기 슬라이더 ────────────────────────────────────────────────────
+// 전체밝기: ambient + directional 강도 조절 (idx 0~8, 중앙=4 기본)
+// 선택밝기: bloom strength 조절 (매칭/전체 노드 후광 세기)
+const BRIGHT_VALS  = [0.05, 0.15, 0.3, 0.5, 0.7, 0.9, 1.1, 1.4, 1.8];
+const BRIGHT_LABELS = ['극어둠','매우어둠','어둠','약간어둠','기본','약간밝음','밝음','매우밝음','최대'];
+const ambientLight = scene.children.find(c => c.isAmbientLight);
+const dirLight     = scene.children.find(c => c.isDirectionalLight);
+const BASE_AMBIENT = 0.6, BASE_DIR = 0.8;
+
+function setSceneBright(idx) {
+  const v = BRIGHT_VALS[idx];
+  if (ambientLight) ambientLight.intensity = BASE_AMBIENT * v / 0.7;
+  if (dirLight)     dirLight.intensity     = BASE_DIR     * v / 0.7;
+  document.getElementById('scene-bright-label').textContent = BRIGHT_LABELS[idx];
+  localStorage.setItem('sceneBrightStep', idx);
+}
+
+const GLOW_VALS   = [0.0, 0.3, 0.6, 0.9, 1.2, 1.6, 2.0, 2.5, 3.0];
+const GLOW_LABELS = ['끔','극약','약','보통약','기본','보통강','강','매우강','최대'];
+
+function setGlowBright(idx) {
+  bloomPass.strength = GLOW_VALS[idx];
+  document.getElementById('glow-bright-label').textContent = GLOW_LABELS[idx];
+  localStorage.setItem('glowBrightStep', idx);
+}
+
+const sceneBrightSlider = document.getElementById('scene-bright-slider');
+const glowBrightSlider  = document.getElementById('glow-bright-slider');
+const savedSceneBright  = Math.min(8, Math.max(0, parseInt(localStorage.getItem('sceneBrightStep') ?? '4')));
+const savedGlowBright   = Math.min(8, Math.max(0, parseInt(localStorage.getItem('glowBrightStep') ?? '4')));
+sceneBrightSlider.value = savedSceneBright; setSceneBright(savedSceneBright);
+glowBrightSlider.value  = savedGlowBright;  setGlowBright(savedGlowBright);
+sceneBrightSlider.addEventListener('input', e => setSceneBright(parseInt(e.target.value)));
+glowBrightSlider.addEventListener('input',  e => setGlowBright(parseInt(e.target.value)));
+
+// ── X/Y 축 회전 슬라이더 ─────────────────────────────────────────────
+// idx 0~8, 중앙(4) = 정지, 단위 = 0.0004 rad/frame
+const ROT_SPEED_UNIT = 0.0004;
+const ROT_LABELS = ['◀ 빠름', '◀ 보통', '◀ 느림', '◀ 미세', '정지', '▶ 미세', '▶ 느림', '▶ 보통', '▶ 빠름'];
+
+function idxToSpeed(idx) { return (idx - 4) * ROT_SPEED_UNIT; }
+
+function setRotX(idx) {
+  rotSpeedX = idxToSpeed(idx);
+  document.getElementById('rotx-label').textContent = ROT_LABELS[idx];
+  localStorage.setItem('rotXStep', idx);
+}
+
+function setRotY(idx) {
+  rotSpeedY = idxToSpeed(idx);
+  document.getElementById('roty-label').textContent = ROT_LABELS[idx];
+  localStorage.setItem('rotYStep', idx);
+}
+
+const rotXSlider = document.getElementById('rotx-slider');
+const rotYSlider = document.getElementById('roty-slider');
+
+// 기본값: X=정지(4), Y=▶느림(6 = 0.0008 rad/frame)
+const savedRotX = Math.min(8, Math.max(0, parseInt(localStorage.getItem('rotXStep') ?? '4')));
+const savedRotY = Math.min(8, Math.max(0, parseInt(localStorage.getItem('rotYStep') ?? '6')));
+rotXSlider.value = savedRotX; setRotX(savedRotX);
+rotYSlider.value = savedRotY; setRotY(savedRotY);
+rotXSlider.addEventListener('input', e => setRotX(parseInt(e.target.value)));
+rotYSlider.addEventListener('input', e => setRotY(parseInt(e.target.value)));
+
+// ── 검색 & 엣지 하이라이트 ───────────────────────────────────────────
+const DEFAULT_EC  = new THREE.Color(0x2a3a5a);
+const HIDE_EC     = new THREE.Color(0x0a0c14);  // 배경색 = 숨김
+const KEYWORD_EC  = new THREE.Color(0x00dd88);  // 초록
+const AUTHOR_EC   = new THREE.Color(0xffdd00);  // 노랑
+
+let kwQuery      = '';
+let auQuery      = '';
+let searchActive = false;
+let glowNodeIds  = new Set();
+
+function applySearch() {
+  if (!edgeLineObj || !validEdgeData.length) return;
+  const kq = kwQuery.trim().toLowerCase();
+  const aq = auQuery.trim().toLowerCase();
+  const anyActive = !!(kq || aq);
+  searchActive = anyActive;
+  const ca = edgeLineObj.geometry.attributes.color;
+
+  // 매칭 노드 수집
+  const kwIds = new Set(), auIds = new Set();
+  nodeObjects.forEach(({ mesh }) => {
+    const d = mesh.userData;
+    if (kq) {
+      const text = ((d.label || '') + ' ' + (d.id || '')).toLowerCase();
+      if (text.includes(kq)) kwIds.add(d.id);
+    }
+    if (aq) {
+      const author = (d.author || d.label || '').toLowerCase();
+      if (author.includes(aq)) auIds.add(d.id);
+    }
+  });
+  glowNodeIds = new Set([...kwIds, ...auIds]);
+
+  // 엣지 색상 — 저자(노랑) > 키워드(초록) > 숨김
+  validEdgeData.forEach((e, i) => {
+    let c;
+    if (!anyActive)                                                   c = DEFAULT_EC;
+    else if (auIds.has(e.source) || auIds.has(e.target))             c = AUTHOR_EC;
+    else if (kwIds.has(e.source) || kwIds.has(e.target))             c = KEYWORD_EC;
+    else                                                              c = HIDE_EC;
+    ca.setXYZ(i*2,   c.r, c.g, c.b);
+    ca.setXYZ(i*2+1, c.r, c.g, c.b);
+  });
+  ca.needsUpdate = true;
+
+  // 매칭 노드 크기 강조 + bloom layer 제어
+  nodeObjects.forEach(({ mesh }) => {
+    const base  = mesh.userData._origScale || 1.0;
+    const hit   = anyActive && glowNodeIds.has(mesh.userData.id);
+    mesh.scale.setScalar(hit ? base * 1.6 : base);
+    if (!anyActive || hit) mesh.layers.enable(BLOOM_LAYER);
+    else                   mesh.layers.disable(BLOOM_LAYER);
+  });
+}
+
+document.getElementById('kw-box').addEventListener('input', e => { kwQuery = e.target.value; applySearch(); });
+document.getElementById('au-box').addEventListener('input', e => { auQuery = e.target.value; applySearch(); });
+document.querySelectorAll('.search-clr').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = document.getElementById(btn.dataset.target);
+    target.value = '';
+    if (btn.dataset.target === 'kw-box') kwQuery = '';
+    else auQuery = '';
+    applySearch();
+  });
+});
 
 // 초기 로드
 loadView('keywords', null);
