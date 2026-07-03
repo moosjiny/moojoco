@@ -24,7 +24,7 @@ REDIS_PORT    = 6379
 REDIS_PASS    = os.environ.get("REDIS_PASS", "")
 REDIS_CHANNEL = "moojoco:status"
 THESIS_API    = "https://thesis.hyperbook.com/api/papers"
-THESIS_TOKEN  = "c0c76a681dad4c3c569a8f580478f161e27a3fad4b5ffbb0"
+THESIS_TOKEN  = os.environ.get("THESIS_TOKEN_MOOJOCO", "")
 RESOURCE_LIMIT = 30.0   # CPU/GPU 점유율 상한 (%)
 HEARTBEAT_INTERVAL = 5  # 초
 
