@@ -1,0 +1,14 @@
+[Unit]
+Description=Moojoco MuJoCo Dual-Arm Sim (EGL GPU Rendering + Rerun Stream)
+After=network.target
+
+[Service]
+Type=simple
+User=moos
+WorkingDirectory=/home/moos/dev_ws/dual_arms
+ExecStart=/home/moos/venv/dual_arms/bin/python3 scripts/sim_dual_arm.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
