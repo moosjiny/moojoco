@@ -161,6 +161,12 @@ CLUSTER_COLOR = {
 }
 
 
+@app.get("/")
+def root():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/viz/thesis-3d", status_code=302)
+
+
 @app.get("/health")
 def health():
     cpu, gpu = get_resource()
@@ -366,7 +372,7 @@ _HTML = """<!DOCTYPE html>
 <div id="legend">
   <span class="lc" style="background:#ff6b9d"></span>EROS<br>
   <span class="lc" style="background:#69d2e7"></span>EOS<br>
-  <span class="lc" style="background:#ff8a65"></span>Moojoco<br>
+  <span class="lc" style="background:#ff8a65"></span><a href="https://hb5u.hyperbook.com/viz/thesis-3d" style="color:inherit;text-decoration:none;" title="thesis-3d 열기">Moojoco</a><br>
   <span class="lc" style="background:#a8e063"></span>Aegis<br>
   <span class="lc" style="background:#b39ddb"></span>Hermes<br>
   <span class="lc" style="background:#ffd54f"></span>Rudex<br>
