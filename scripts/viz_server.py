@@ -213,7 +213,8 @@ def _layout_network(papers):
                     edges.append({"source": slugs[i], "target": slugs[j], "weight": 1})
 
     nodes = force_layout_3d(nodes, edges)
-    return {"nodes": nodes, "edges": edges, "type": "network"}
+    # "links"는 EC2(ers) 소비자 호환용 별칭 — EC2 쪽이 links 키를 기대함
+    return {"nodes": nodes, "edges": edges, "links": edges, "type": "network", "source": "hb5u"}
 
 
 def _layout_keywords(papers):
@@ -247,7 +248,8 @@ def _layout_keywords(papers):
         if s in node_set and t in node_set
     ]
     nodes = force_layout_3d(nodes, edges)
-    return {"nodes": nodes, "edges": edges, "type": "keywords"}
+    # "links"는 EC2(ers) 소비자 호환용 별칭 — EC2 쪽이 links 키를 기대함
+    return {"nodes": nodes, "edges": edges, "links": edges, "type": "keywords", "source": "hb5u"}
 
 
 @app.get("/viz/thesis-3d", response_class=HTMLResponse)
