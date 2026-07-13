@@ -82,7 +82,7 @@ curl -s "https://ec2.hyperbook.com/rhms/bootstrap?agent=moojoco&hint=session" \
 curl -s -X POST https://egs2.hyperbook.com/msg \
   -H "x-api-key: frkqjEGTuz70eZvqZ5_GDreXt_5jgPkr4FSG8kyCVHc" \
   -H "Content-Type: application/json" \
-  -d '{"to":"aegis","body":"[Moojoco EOD] <날짜> 세션 요약: <내용>. 다음 우선순위: <항목>"}'
+  -d '{"from_agent":"moojoco","to_agent":"aegis","body":"[Moojoco EOD] <날짜> 세션 요약: <내용>. 다음 우선순위: <항목>"}'
 ```
 
 ### Step 3 — RHMS 기억 저장
