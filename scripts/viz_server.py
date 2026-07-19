@@ -1,8 +1,10 @@
 """
 Moojoco 3D Thesis Viz Server
 - Redis heartbeat publisher (5s, moojoco:status)
-- GET /health  → { status, cpu, gpu }
+- Redis layout cache  (layout:network, layout:keywords, TTL=600s)
+- GET /health  → { status, cpu, gpu, layout_engine, cache_hits }
 - GET /layout?type=network|keywords → 3D force-directed layout
+- GET /layout/invalidate → 캐시 즉시 무효화
 - GET /viz/thesis-3d → Three.js 3D 시각화 페이지
 """
 import os, threading, time, math, json, requests
@@ -13,6 +15,17 @@ import pynvml  # nvidia-ml-py 패키지 사용 (pip install nvidia-ml-py)
 from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn
+
+try:
+    import cupy as cp
+    _CUPY_OK = True
+except ImportError:
+    _CUPY_OK = False
+
+import subprocess
+from pathlib import Path
+_BINARY = Path(__file__).parent / "layout_engine"
+_BINARY_OK = _BINARY.exists() and _BINARY.is_file()
 
 # ── 설정 ──────────────────────────────────────────────────────────────
 PORT          = 8891
@@ -39,16 +52,21 @@ except Exception:
     _gpu_ok = False
 
 
+_resource_cache = {"cpu": 0.0, "gpu": 0.0}
+
+
 def get_resource():
-    cpu = psutil.cpu_percent(interval=0.3)
-    gpu = 0.0
+    return _resource_cache["cpu"], _resource_cache["gpu"]
+
+
+def _refresh_resource():
+    _resource_cache["cpu"] = psutil.cpu_percent(interval=0.3)
     if _gpu_ok:
         try:
             util = pynvml.nvmlDeviceGetUtilizationRates(_gpu_handle)
-            gpu = float(util.gpu)
+            _resource_cache["gpu"] = float(util.gpu)
         except Exception:
             pass
-    return cpu, gpu
 
 
 def resource_status(cpu, gpu):
@@ -65,6 +83,7 @@ def _heartbeat_loop():
             if r is None:
                 r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT,
                                 password=REDIS_PASS, decode_responses=True)
+            _refresh_resource()
             cpu, gpu = get_resource()
             status = resource_status(cpu, gpu)
             r.publish(REDIS_CHANNEL, status)
@@ -79,8 +98,94 @@ def _heartbeat_loop():
 threading.Thread(target=_heartbeat_loop, daemon=True).start()
 
 
+# ── Redis 공유 클라이언트 + 레이아웃 캐시 ────────────────────────────
+LAYOUT_CACHE_TTL  = 600   # 레이아웃 결과 캐시 유효기간 (초)
+LAYOUT_CACHE_KEYS = {"network": "layout:network", "keywords": "layout:keywords", "4d": "layout:4d"}
+
+_redis_shared: "redis.Redis | None" = None
+_redis_shared_lock = threading.Lock()
+_cache_stats = {"hits": 0, "misses": 0}
+
+# L1 인메모리 캐시 (5초) — Redis 역직렬화 반복 방지
+_l1_cache: dict = {}   # key → {"data": dict, "ts": float}
+L1_TTL = 5  # 초
+
+
+def _get_redis():
+    global _redis_shared
+    if _redis_shared is not None:
+        return _redis_shared
+    with _redis_shared_lock:
+        if _redis_shared is None:
+            try:
+                _redis_shared = redis.Redis(
+                    host=REDIS_HOST, port=REDIS_PORT,
+                    password=REDIS_PASS, decode_responses=True,
+                    socket_connect_timeout=3, socket_timeout=3,
+                )
+                _redis_shared.ping()
+            except Exception as e:
+                print(f"[redis] 연결 실패: {e}")
+                _redis_shared = None
+    return _redis_shared
+
+
+def _layout_cache_get(layout_type: str):
+    key = LAYOUT_CACHE_KEYS.get(layout_type)
+    if not key:
+        return None
+    # L1 — 인메모리
+    l1 = _l1_cache.get(key)
+    if l1 and (time.time() - l1["ts"]) < L1_TTL:
+        _cache_stats["hits"] += 1
+        return {**l1["data"], "cached": True, "cache_level": "l1"}
+    # L2 — Redis
+    try:
+        r = _get_redis()
+        if r:
+            raw = r.get(key)
+            if raw:
+                _cache_stats["hits"] += 1
+                data = json.loads(raw)
+                data["cached"] = True
+                data["cache_level"] = "l2"
+                _l1_cache[key] = {"data": data, "ts": time.time()}
+                return data
+    except Exception:
+        pass
+    _cache_stats["misses"] += 1
+    return None
+
+
+def _layout_cache_set(layout_type: str, data: dict):
+    key = LAYOUT_CACHE_KEYS.get(layout_type)
+    if not key:
+        return
+    try:
+        r = _get_redis()
+        if r:
+            r.set(key, json.dumps(data), ex=LAYOUT_CACHE_TTL)
+    except Exception as e:
+        print(f"[cache] set 실패: {e}")
+
+
+def _layout_cache_invalidate():
+    # L1 먼저
+    _l1_cache.clear()
+    deleted = 0
+    try:
+        r = _get_redis()
+        if r:
+            for k in LAYOUT_CACHE_KEYS.values():
+                deleted += r.delete(k)
+    except Exception as e:
+        print(f"[cache] invalidate 실패: {e}")
+    print(f"[cache] 무효화 — L1 cleared, L2 {deleted}개 키 삭제")
+    return deleted
+
+
 # ── 논문 데이터 로더 ──────────────────────────────────────────────────
-_papers_cache = {"ts": 0, "data": []}
+_papers_cache = {"ts": 0, "data": [], "count": -1}
 CACHE_TTL = 120  # 초
 
 
@@ -94,8 +199,15 @@ def fetch_papers():
                          timeout=8)
         raw = r.json()
         papers = raw.get("papers", raw) if isinstance(raw, dict) else raw
-        _papers_cache["data"] = [p for p in papers if p.get("tags")]
-        _papers_cache["ts"] = now
+        new_papers = [p for p in papers if p.get("tags")]
+        new_count  = len(new_papers)
+        old_count  = _papers_cache["count"]
+        if old_count >= 0 and new_count != old_count:
+            print(f"[fetch_papers] 논문 수 변경 {old_count}→{new_count}, 레이아웃 캐시 무효화")
+            _layout_cache_invalidate()
+        _papers_cache["data"]  = new_papers
+        _papers_cache["count"] = new_count
+        _papers_cache["ts"]    = now
     except Exception as e:
         print(f"[fetch_papers] {e}")
     return _papers_cache["data"]
@@ -112,21 +224,96 @@ def parse_tag(raw):
 
 # ── 3D Force-directed 레이아웃 계산 ───────────────────────────────────
 def force_layout_3d(nodes, edges, iterations=80):
+    if _BINARY_OK:
+        return _force_layout_binary(nodes, edges, iterations)
+    if _CUPY_OK:
+        return _force_layout_gpu(nodes, edges, iterations)
+    return _force_layout_cpu(nodes, edges, iterations)
+
+
+def _force_layout_binary(nodes, edges, iterations=80):
+    """C++ CUDA 바이너리 (layout_engine) 호출 — 가장 빠른 경로."""
+    if not nodes:
+        return nodes
+    payload = json.dumps({"nodes": nodes, "edges": edges, "iterations": iterations})
+    try:
+        result = subprocess.run(
+            [str(_BINARY)],
+            input=payload, capture_output=True, text=True, timeout=30
+        )
+        if result.returncode != 0:
+            print(f"[layout_binary] stderr: {result.stderr.strip()}")
+            return _force_layout_cpu(nodes, edges, iterations)
+        out = json.loads(result.stdout)
+        out_nodes = {nd["id"]: nd for nd in out["nodes"]}
+        for nd in nodes:
+            updated = out_nodes.get(nd["id"])
+            if updated:
+                nd["x"], nd["y"], nd["z"] = updated["x"], updated["y"], updated["z"]
+        print(f"[layout_binary] {len(nodes)}노드 {out.get('ms', 0):.2f}ms (GPU)")
+        return nodes
+    except Exception as e:
+        print(f"[layout_binary] 실패 → CPU fallback: {e}")
+        return _force_layout_cpu(nodes, edges, iterations)
+
+
+def _force_layout_gpu(nodes, edges, iterations=80):
+    """CuPy GPU 가속 Fruchterman-Reingold — 완전 벡터화."""
+    n = len(nodes)
+    if n == 0:
+        return nodes
+    pos = cp.random.randn(n, 3, dtype=cp.float32)
+    id2idx = {nd["id"]: i for i, nd in enumerate(nodes)}
+    k = math.sqrt(1.0 / max(n, 1))
+
+    srcs, tgts = [], []
+    for e in edges:
+        si, ti = id2idx.get(e["source"]), id2idx.get(e["target"])
+        if si is not None and ti is not None:
+            srcs.append(si); tgts.append(ti)
+    has_edges = bool(srcs)
+    if has_edges:
+        srcs_gpu = cp.array(srcs, dtype=cp.int32)
+        tgts_gpu = cp.array(tgts, dtype=cp.int32)
+
+    for _ in range(iterations):
+        diff = pos[:, None, :] - pos[None, :, :]          # (n,n,3)
+        dist = cp.linalg.norm(diff, axis=2, keepdims=True).clip(0.01)
+        delta = (diff / dist ** 2 * k ** 2).sum(axis=1)   # (n,3)
+
+        if has_edges:
+            attract = cp.zeros((n, 3), dtype=cp.float32)
+            d = pos[tgts_gpu] - pos[srcs_gpu]
+            dist_e = cp.linalg.norm(d, axis=1, keepdims=True).clip(0.01)
+            f = d * dist_e / k
+            cp.add.at(attract, srcs_gpu, f)
+            cp.add.at(attract, tgts_gpu, -f)
+            delta = delta + attract
+
+        norm = cp.linalg.norm(delta, axis=1, keepdims=True).clip(0.01)
+        pos = pos + delta / norm * cp.minimum(norm, 0.5)
+
+    pos_cpu = pos.get()
+    for i, nd in enumerate(nodes):
+        nd["x"], nd["y"], nd["z"] = float(pos_cpu[i, 0]), float(pos_cpu[i, 1]), float(pos_cpu[i, 2])
+    return nodes
+
+
+def _force_layout_cpu(nodes, edges, iterations=80):
+    """NumPy CPU fallback."""
     n = len(nodes)
     if n == 0:
         return nodes
     pos = np.random.randn(n, 3).astype(np.float32)
     id2idx = {nd["id"]: i for i, nd in enumerate(nodes)}
-
     k = math.sqrt(1.0 / max(n, 1))
+
     for _ in range(iterations):
         delta = np.zeros((n, 3), dtype=np.float32)
-        # repulsion
         for i in range(n):
-            diff = pos[i] - pos          # (n,3)
+            diff = pos[i] - pos
             dist = np.linalg.norm(diff, axis=1, keepdims=True).clip(0.01)
             delta[i] += (diff / dist ** 2 * k ** 2).sum(axis=0)
-        # attraction
         for e in edges:
             si, ti = id2idx.get(e["source"]), id2idx.get(e["target"])
             if si is None or ti is None:
@@ -136,10 +323,8 @@ def force_layout_3d(nodes, edges, iterations=80):
             f = d * dist / k
             delta[si] += f
             delta[ti] -= f
-        # apply
         norm = np.linalg.norm(delta, axis=1, keepdims=True).clip(0.01)
-        step = np.minimum(norm, 0.5)
-        pos += delta / norm * step
+        pos += delta / norm * np.minimum(norm, 0.5)
 
     for i, nd in enumerate(nodes):
         nd["x"], nd["y"], nd["z"] = float(pos[i, 0]), float(pos[i, 1]), float(pos[i, 2])
@@ -170,7 +355,20 @@ def root():
 @app.get("/health")
 def health():
     cpu, gpu = get_resource()
-    return {"status": resource_status(cpu, gpu), "cpu": round(cpu, 1), "gpu": round(gpu, 1)}
+    return {
+        "status": resource_status(cpu, gpu),
+        "cpu": round(cpu, 1),
+        "gpu": round(gpu, 1),
+        "layout_engine": "cpp-cuda" if _BINARY_OK else ("cupy-gpu" if _CUPY_OK else "numpy-cpu"),
+        "cache_hits": _cache_stats["hits"],
+        "cache_misses": _cache_stats["misses"],
+    }
+
+
+@app.get("/layout/invalidate")
+def layout_invalidate():
+    deleted = _layout_cache_invalidate()
+    return {"deleted": deleted, "keys": list(LAYOUT_CACHE_KEYS.values())}
 
 
 @app.get("/layout")
@@ -180,16 +378,24 @@ def layout(type: str = Query("network")):
         return JSONResponse(status_code=503,
                             content={"error": "busy", "cpu": cpu, "gpu": gpu})
 
-    papers = fetch_papers()
+    cached = _layout_cache_get(type)
+    if cached is not None:
+        return JSONResponse(cached)
 
-    if type == "keywords":
-        return _layout_keywords(papers)
-    return _layout_network(papers)
+    papers = fetch_papers()
+    if type == "4d":
+        from viz4d.layout import compute_4d
+        result = compute_4d(papers, force_layout_3d, parse_tag, _layout_network, _layout_keywords)
+    elif type == "keywords":
+        result = _layout_keywords(papers)
+    else:
+        result = _layout_network(papers)
+    _layout_cache_set(type, result)
+    return JSONResponse(result)
 
 
 def _layout_network(papers):
-    nodes, edges = [], []
-    seen_edges = set()
+    nodes = []
     for p in papers:
         nid = p["slug"]
         nodes.append({
@@ -199,18 +405,20 @@ def _layout_network(papers):
             "color": "#a0c4ff",
             "paper_count": 1,
         })
-    # author가 같은 논문끼리 엣지
-    from collections import defaultdict
-    by_author = defaultdict(list)
-    for p in papers:
-        by_author[p.get("author", "")].append(p["slug"])
-    for author, slugs in by_author.items():
-        for i in range(len(slugs)):
-            for j in range(i + 1, len(slugs)):
-                key = tuple(sorted([slugs[i], slugs[j]]))
-                if key not in seen_edges:
-                    seen_edges.add(key)
-                    edges.append({"source": slugs[i], "target": slugs[j], "weight": 1})
+    # 엣지 가중치 = 공유 태그 수(같은 저자면 최소 1) — 저자 무관하게 태그가
+    # 겹치는 논문끼리 연결해 개념적 근접성(예: 기술↔철학)을 두께로 드러낸다
+    tag_sets = {p["slug"]: {parse_tag(t)["en"] for t in p.get("tags", [])} for p in papers}
+    edge_weight = {}
+    for i in range(len(papers)):
+        for j in range(i + 1, len(papers)):
+            pi, pj = papers[i], papers[j]
+            si, sj = pi["slug"], pj["slug"]
+            shared = len(tag_sets[si] & tag_sets[sj])
+            same_author = pi.get("author") and pi.get("author") == pj.get("author")
+            if not shared and not same_author:
+                continue
+            edge_weight[tuple(sorted([si, sj]))] = max(shared, 1)
+    edges = [{"source": s, "target": t, "weight": w} for (s, t), w in edge_weight.items()]
 
     nodes = force_layout_3d(nodes, edges)
     # "links"는 EC2(ers) 소비자 호환용 별칭 — EC2 쪽이 links 키를 기대함
@@ -257,11 +465,18 @@ def viz_page():
     return HTMLResponse(content=_HTML)
 
 
+@app.get("/viz/thesis-4d", response_class=HTMLResponse)
+def viz_4d_page():
+    from viz4d.page import HTML_4D
+    return HTMLResponse(content=HTML_4D)
+
+
 # ── Three.js HTML ─────────────────────────────────────────────────────
 _HTML = """<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
 <title>ROOPS Thesis 3D 네트워크</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -576,12 +791,14 @@ function clearGraph() {
   edgeData = [];
   nodeIdToMesh = {};
   nodeIdToSprite = {};
+  edgeTubes = [];
   autoRotate = true;
   selectedIds.clear();
   groupDragOffsets = null;
 }
 
 // ── Load layout from API ─────────────────────────────────────────────
+window.loadView = loadView;  // HTML onclick에서 호출 가능하도록 (module 스코프 노출)
 async function loadView(type, btn) {
   document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
@@ -604,15 +821,16 @@ async function loadView(type, btn) {
 
 // ── 저자 색상 맵 ─────────────────────────────────────────────────────
 const AUTHOR_COLORS = {
-  'eros':    '#ff6b9d',  // 핑크
-  'eос':     '#ff6b9d',
-  'eos':     '#69d2e7',  // 시안
+  'eros':    '#f48fb1',
+  'eос':     '#f48fb1',
+  'eos':     '#26c6da',
   'moojoco': '#ff8a65',  // 오렌지
-  'aegis':   '#a8e063',  // 연두
-  'hermes':  '#b39ddb',  // 보라
+  'aegis':   '#ffd600',
+  'hermes':  '#4ade80',
   'rudex':   '#ffd54f',  // 노랑
   'mojo':    '#81d4fa',  // 하늘
-  'recon':   '#f48fb1',  // 연핑크
+  'recon':   '#ce93d8',
+  'haru':    '#fb923c',
   'unknown': '#607d8b',  // 회청
 };
 function authorColor(author) {
@@ -650,6 +868,21 @@ function buildGraph(data) {
     edgeLineObj = new THREE.LineSegments(geo, mat);
     graphGroup.add(edgeLineObj);
   }
+
+  // 가중치 ≥2 엣지 — 얇은 기준선 위에 원기둥을 겹쳐 태그 공유 수만큼 두껍게 표시
+  // (LineSegments는 세그먼트별 두께를 지원하지 않아 별도 메시로 표현)
+  edgeTubes = [];
+  const tubeMat = new THREE.MeshBasicMaterial({ color: 0x5b7fb0, transparent: true, opacity: 0.35 });
+  edges.forEach(e => {
+    const w = e.weight || 1;
+    if (w < 2) return;
+    const s = idToNode[e.source], t = idToNode[e.target];
+    if (!s || !t) return;
+    const radius = Math.min(0.4, w * 0.045);
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 1, 6), tubeMat);
+    graphGroup.add(tube);
+    edgeTubes.push({ mesh: tube, source: e.source, target: e.target });
+  });
 
   // 저자별 도형 (논문 네트워크 뷰)
   const AUTHOR_GEO = {
@@ -703,6 +936,8 @@ function buildGraph(data) {
     graphGroup.add(sprite);
     nodeIdToSprite[n.id] = sprite;  // 노드-스프라이트 연결
   });
+
+  positionEdgeTubes();  // nodeIdToMesh가 채워진 뒤 초기 배치
 }
 
 function makeLabel(text, color) {
@@ -720,14 +955,14 @@ function makeLabel(text, color) {
   ctx.textAlign = 'center';
 
   if (isMulti) {
-    ctx.font = 'bold 22px sans-serif';
+    ctx.font = 'bold 22px "Noto Sans KR", sans-serif';
     ctx.fillStyle = '#' + color.getHexString();
     ctx.fillText(line1, 128, 30);
-    ctx.font = '17px sans-serif';
+    ctx.font = '17px "Noto Sans KR", sans-serif';
     ctx.fillStyle = '#' + color.getHexString() + 'bb';
     ctx.fillText(line2, 128, 62);
   } else {
-    ctx.font = 'bold 22px sans-serif';
+    ctx.font = 'bold 22px "Noto Sans KR", sans-serif';
     ctx.fillStyle = '#' + color.getHexString();
     ctx.fillText(text, 128, 42);
   }
@@ -986,6 +1221,7 @@ let edgeLineObj = null;
 let edgeData = [];
 let validEdgeData = [];
 let nodeIdToMesh = {};
+let edgeTubes = [];  // 가중치 ≥2 엣지의 두께 표현용 원기둥 메시
 
 function updateEdges() {
   if (!edgeLineObj || !edgeData.length) return;
@@ -999,6 +1235,24 @@ function updateEdges() {
     i += 6;
   });
   pos.needsUpdate = true;
+  positionEdgeTubes();
+}
+
+const _tubeUp = new THREE.Vector3(0, 1, 0);
+const _tubeDir = new THREE.Vector3();
+const _tubeMid = new THREE.Vector3();
+function positionEdgeTubes() {
+  edgeTubes.forEach(({ mesh, source, target }) => {
+    const s = nodeIdToMesh[source], t = nodeIdToMesh[target];
+    if (!s || !t) return;
+    _tubeDir.subVectors(t.position, s.position);
+    const len = _tubeDir.length();
+    if (len < 1e-6) return;
+    _tubeMid.addVectors(s.position, t.position).multiplyScalar(0.5);
+    mesh.position.copy(_tubeMid);
+    mesh.scale.set(1, len, 1);
+    mesh.quaternion.setFromUnitVectors(_tubeUp, _tubeDir.clone().normalize());
+  });
 }
 
 // ── Animation loop ───────────────────────────────────────────────────
