@@ -7,12 +7,13 @@ Moojoco 3D Thesis Viz Server
 - GET /layout/invalidate → 캐시 즉시 무효화
 - GET /viz/thesis-3d → Three.js 3D 시각화 페이지
 """
-import os, threading, time, math, json, requests
+import os, threading, time, math, json, requests, sqlite3
+from datetime import datetime, timezone
 import numpy as np
 import psutil
 import redis
 import pynvml  # nvidia-ml-py 패키지 사용 (pip install nvidia-ml-py)
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn
 
@@ -371,6 +372,53 @@ def layout_invalidate():
     return {"deleted": deleted, "keys": list(LAYOUT_CACHE_KEYS.values())}
 
 
+# ── thesis-4d 사용자 보정 위치 (SQLite) ──────────────────────────────────
+_CORR_DB = Path(__file__).parent.parent / "data" / "viz4d_corrections.db"
+_CORR_DB.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _corr_conn():
+    conn = sqlite3.connect(_CORR_DB)
+    conn.execute("""CREATE TABLE IF NOT EXISTS corrections (
+        slug TEXT PRIMARY KEY,
+        x REAL, y REAL, z REAL,
+        corrected_by TEXT,
+        corrected_at TEXT
+    )""")
+    return conn
+
+
+@app.get("/viz4d/corrections")
+def viz4d_get_corrections():
+    with _corr_conn() as conn:
+        rows = conn.execute(
+            "SELECT slug, x, y, z, corrected_by, corrected_at FROM corrections"
+        ).fetchall()
+    return {
+        slug: {"x": x, "y": y, "z": z, "corrected_by": by, "corrected_at": at}
+        for slug, x, y, z, by, at in rows
+    }
+
+
+@app.post("/viz4d/correction")
+async def viz4d_save_correction(request: Request):
+    body = await request.json()
+    slug = body.get("slug")
+    if not slug:
+        return JSONResponse(status_code=422, content={"error": "slug required"})
+    x, y, z = float(body.get("x", 0)), float(body.get("y", 0)), float(body.get("z", 0))
+    corrected_by = (body.get("corrected_by") or "익명").strip()[:64]
+    corrected_at = datetime.now(timezone.utc).isoformat()
+    with _corr_conn() as conn:
+        conn.execute(
+            "INSERT INTO corrections (slug, x, y, z, corrected_by, corrected_at) VALUES (?,?,?,?,?,?) "
+            "ON CONFLICT(slug) DO UPDATE SET x=excluded.x, y=excluded.y, z=excluded.z, "
+            "corrected_by=excluded.corrected_by, corrected_at=excluded.corrected_at",
+            (slug, x, y, z, corrected_by, corrected_at),
+        )
+    return {"status": "ok", "slug": slug, "corrected_by": corrected_by, "corrected_at": corrected_at}
+
+
 @app.get("/layout")
 def layout(type: str = Query("network")):
     cpu, gpu = get_resource()
@@ -586,16 +634,7 @@ _HTML = """<!DOCTYPE html>
     <input type="range" id="glow-bright-slider" class="ctrl-slider" min="0" max="8" step="1">
   </div>
 </div>
-<div id="legend">
-  <span class="lc" style="background:#ff6b9d"></span>EROS<br>
-  <span class="lc" style="background:#69d2e7"></span>EOS<br>
-  <span class="lc" style="background:#ff8a65"></span><a href="https://hb5u.hyperbook.com/viz/thesis-3d" style="color:inherit;text-decoration:none;" title="thesis-3d 열기">Moojoco</a><br>
-  <span class="lc" style="background:#a8e063"></span>Aegis<br>
-  <span class="lc" style="background:#b39ddb"></span>Hermes<br>
-  <span class="lc" style="background:#ffd54f"></span>Rudex<br>
-  <span class="lc" style="background:#81d4fa"></span>Mojo<br>
-  <span class="lc" style="background:#607d8b"></span>Unknown<br>
-</div>
+<div id="legend"></div>
 <div id="panel">
   <button id="panel-close" onclick="closePanel()">✕</button>
   <div id="panel-body"></div>
@@ -837,6 +876,21 @@ function authorColor(author) {
   if (!author) return AUTHOR_COLORS['unknown'];
   return AUTHOR_COLORS[author.toLowerCase()] || AUTHOR_COLORS['unknown'];
 }
+
+// 범례 = AUTHOR_COLORS 단일 진실 원천(SSoT) — 값을 여기서 바꾸면 범례도 함께 갱신됨
+const LEGEND_SKIP = new Set(['eос']);  // 'eos' 오타 허용용 키(키릴 о) — 범례 중복 방지
+(function renderLegend() {
+  const el = document.getElementById('legend');
+  el.innerHTML = Object.entries(AUTHOR_COLORS)
+    .filter(([key]) => !LEGEND_SKIP.has(key))
+    .map(([key, color]) => {
+      const label = key === 'moojoco'
+        ? '<a href="https://hb5u.hyperbook.com/viz/thesis-3d" style="color:inherit;text-decoration:none;" title="thesis-3d 열기">Moojoco</a>'
+        : key.charAt(0).toUpperCase() + key.slice(1);
+      return `<span class="lc" style="background:${color}"></span>${label}<br>`;
+    })
+    .join('');
+})();
 
 function buildGraph(data) {
   const { nodes, edges, type } = data;

@@ -62,6 +62,10 @@ body { background:#0a0c14; color:#e0e0e0; font-family:'JetBrains Mono',monospace
   border-radius:5px; padding:7px 10px; font-size:0.68rem;
   color:#ccc; max-width:280px; line-height:1.6; z-index:100;
 }
+#selRect {
+  position:fixed; border:2px dashed #a0c4ff; background:rgba(100,180,255,0.08);
+  pointer-events:none; display:none; z-index:50;
+}
 </style>
 </head>
 <body>
@@ -74,6 +78,11 @@ body { background:#0a0c14; color:#e0e0e0; font-family:'JetBrains Mono',monospace
     <button class="btn active" id="btn-kw"      onclick="toggleLayer('kw')">개념 레이어</button>
     <button class="btn" id="btn-rotate" onclick="toggleRotate()">자동회전 OFF</button>
   </div>
+  <div class="ctrl-row" style="margin-top:6px">
+    <label>보정자</label>
+    <input type="text" id="corrector-name" placeholder="이름/콜사인"
+           style="width:110px; background:#1a1d2a; border:1px solid #333; color:#ccc; font-size:0.68rem; padding:2px 6px; border-radius:3px;">
+  </div>
   <div id="ctrl-bar">
     <div class="ctrl-row">
       <label>4D 투영 t=</label>
@@ -83,7 +92,7 @@ body { background:#0a0c14; color:#e0e0e0; font-family:'JetBrains Mono',monospace
     </div>
     <div class="ctrl-row">
       <label>레이어 간격</label>
-      <input type="range" class="slider" id="slider-sep" min="20" max="600" value="250"
+      <input type="range" class="slider" id="slider-sep" min="20" max="400" value="80"
              oninput="onSep(this.value)">
       <span id="sep-val">250</span>
     </div>
@@ -117,6 +126,7 @@ body { background:#0a0c14; color:#e0e0e0; font-family:'JetBrains Mono',monospace
 
 <div id="status">로딩 중...</div>
 <div id="tooltip"></div>
+<div id="selRect"></div>
 
 <script type="importmap">
   {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
@@ -157,7 +167,7 @@ scene.background = new THREE.Color(0x0a0c14);
 scene.fog = new THREE.Fog(0x0a0c14, 800, 2000);
 
 const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 3000);
-camera.position.set(0, 80, 650);
+camera.position.set(0, 0, 550);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -170,19 +180,33 @@ scene.add(gridHelper);
 // ── 상태 ───────────────────────────────────────────────────────────
 let data = null;
 let paperMeshes = [], kwMeshes = [], bridgeLines = null;
-let layerSep = 250;
+let layerSep = 80;
 let tVal = 0;
 let showBridges = true, showPapers = true, showKw = true, autoRotate = true;
 
+// ── 보정자 이름 (localStorage에 기억) ─────────────────────────────────
+const correctorInput = document.getElementById('corrector-name');
+correctorInput.value = localStorage.getItem('viz4d_corrector') || '';
+correctorInput.addEventListener('change', () => {
+  localStorage.setItem('viz4d_corrector', correctorInput.value.trim());
+});
+
 // ── 로딩 ───────────────────────────────────────────────────────────
 document.getElementById('status').textContent = '4D 레이아웃 계산 중 (GPU)...';
-fetch('/layout?type=4d')
-  .then(r => r.json())
-  .then(d => {
+Promise.all([
+  fetch('/layout?type=4d').then(r => r.json()),
+  fetch('/viz4d/corrections').then(r => r.json()).catch(() => ({})),
+]).then(([d, corrections]) => {
     data = d;
+    let correctedCount = 0;
+    d.papers.forEach(p => {
+      const c = corrections[p.id];
+      if (c) { p.px = c.x; p.py = c.y; p.pz = c.z; correctedCount++; }
+    });
     build(d);
     document.getElementById('status').textContent =
-      `논문 ${d.papers.length}편 · 개념 ${d.keywords.length}개 · max_w=${d.max_w.toFixed(2)}`;
+      `논문 ${d.papers.length}편 · 개념 ${d.keywords.length}개 · max_w=${d.max_w.toFixed(2)}` +
+      (correctedCount ? ` · 보정 ${correctedCount}건 적용` : '');
   })
   .catch(e => {
     document.getElementById('status').textContent = '로딩 실패: ' + e;
@@ -222,14 +246,15 @@ function build(d) {
     return mesh;
   });
 
-  // 3) 브릿지 라인 (논문 → 개념 중심)
-  buildBridges(d);
+  // 3) 브릿지 라인 (논문 → 실제 태그 키워드 노드, 태그별로 각각)
+  buildBridgesT(d);
 
-  // 4) 논문 엣지 (위 레이어, 얇은 회색)
-  buildEdges(d.paper_edges, d.papers, 'paper', 0x1e2540);
+  // 4) 논문 엣지 (위 레이어, 얇은 회색) — 드래그 중 노드를 따라가야 하므로
+  //    paperMeshes의 현재 위치를 매번 다시 읽어 그리는 buildPaperEdges 사용
+  buildPaperEdges(d.paper_edges);
 
   // 5) 개념 엣지 (아래 레이어, 얇은 청록)
-  buildEdges(d.keyword_edges, d.keywords, 'kw', 0x1a3040);
+  buildKeywordEdges(d.keyword_edges);
 
   // 조명
   scene.add(new THREE.AmbientLight(0x202535, 3));
@@ -238,51 +263,39 @@ function build(d) {
   scene.add(dLight);
 }
 
-function buildBridges(d) {
-  if (bridgeLines) { scene.remove(bridgeLines); bridgeLines.geometry.dispose(); }
-  const positions = [];
-  const colors    = [];
-  d.papers.forEach(p => {
-    const c = wColor(p.wn);
-    // 논문 노드 현재 위치 (위 레이어)
-    positions.push(p.px*120, p.py*120 + layerSep, p.pz*120);
-    colors.push(c.r, c.g, c.b);
-    // 개념 중심 위치 (아래 레이어)
-    positions.push(p.kx*120, p.ky*120 - layerSep, p.kz*120);
-    colors.push(c.r, c.g, c.b);
-  });
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3));
-  const mat = new THREE.LineBasicMaterial({
-    vertexColors: true, transparent: true, opacity: 0.35,
-  });
-  bridgeLines = new THREE.LineSegments(geo, mat);
-  bridgeLines.visible = showBridges;
-  scene.add(bridgeLines);
-}
-
-function buildEdges(edges, nodes, layer, hexColor) {
-  const idMap = {};
-  nodes.forEach(n => { idMap[n.id] = n; });
+// 논문↔논문, 개념↔개념 엣지 — 각 레이어 메시의 "현재" 위치를 읽어서 그리므로,
+// 노드가 드래그·t-슬라이더·레이어 간격 변경으로 움직일 때마다 다시 불러주면
+// 연결된 엣지가 전부 함께 따라온다. (연결이 끊긴 정적 렌더링 방지)
+function _buildLiveEdges(edges, meshes, ids, hexColor) {
+  const idxOf = {};
+  ids.forEach((id, i) => { idxOf[id] = i; });
   const positions = [];
   edges.forEach(e => {
-    const s = idMap[e.source], t = idMap[e.target];
-    if (!s || !t) return;
-    const yOff = layer === 'paper' ? layerSep : -layerSep;
-    const sx = (layer === 'paper' ? s.px : s.kx) * 120;
-    const sy = (layer === 'paper' ? s.py : s.ky) * 120 + yOff;
-    const sz = (layer === 'paper' ? s.pz : s.kz) * 120;
-    const tx = (layer === 'paper' ? t.px : t.kx) * 120;
-    const ty = (layer === 'paper' ? t.py : t.ky) * 120 + yOff;
-    const tz = (layer === 'paper' ? t.pz : t.kz) * 120;
-    positions.push(sx, sy, sz, tx, ty, tz);
+    const si = idxOf[e.source], ti = idxOf[e.target];
+    if (si === undefined || ti === undefined) return;
+    const s = meshes[si].position, t = meshes[ti].position;
+    positions.push(s.x, s.y, s.z, t.x, t.y, t.z);
   });
-  if (!positions.length) return;
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  const mat = new THREE.LineBasicMaterial({ color: hexColor, transparent: true, opacity: 0.4 });
-  scene.add(new THREE.LineSegments(geo, mat));
+  if (positions.length) {
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  }
+  const mat = new THREE.LineBasicMaterial({ color: hexColor, transparent: true, opacity: 0.7 });
+  return new THREE.LineSegments(geo, mat);
+}
+
+let paperEdgeLines = null;
+function buildPaperEdges(edges) {
+  if (paperEdgeLines) { scene.remove(paperEdgeLines); paperEdgeLines.geometry.dispose(); }
+  paperEdgeLines = _buildLiveEdges(edges, paperMeshes, data.papers.map(p => p.id), 0x3d5afe);
+  scene.add(paperEdgeLines);
+}
+
+let keywordEdgeLines = null;
+function buildKeywordEdges(edges) {
+  if (keywordEdgeLines) { scene.remove(keywordEdgeLines); keywordEdgeLines.geometry.dispose(); }
+  keywordEdgeLines = _buildLiveEdges(edges, kwMeshes, data.keywords.map(k => k.id), 0x00b0ff);
+  scene.add(keywordEdgeLines);
 }
 
 // ── t-슬라이더: 4D 투영 ─────────────────────────────────────────────
@@ -305,30 +318,42 @@ function applyT() {
     const z = (k.kz + (k.pz - k.kz) * t) * 120;
     m.position.set(x, y, z);
   });
-  // 브릿지 라인도 갱신
-  if (data) buildBridgesT(data, t);
+  // 브릿지·엣지 라인도 새 위치로 갱신
+  buildBridgesT(data);
+  buildPaperEdges(data.paper_edges);
+  buildKeywordEdges(data.keyword_edges);
 }
 
-function buildBridgesT(d, t) {
+// 브릿지 = 논문 → "그 논문이 가진 각 태그"의 실제 키워드 노드로 각각 하나씩.
+// (예전엔 태그들의 무게중심 한 점으로만 이었는데, 그 중심점은 대개 어느 키워드
+//  노드와도 일치하지 않아 "연결이 안 된 것처럼" 보였다. 이제 태그 수만큼
+//  실제 노드에 닿는 여러 개의 얇은 선으로 그린다. t는 더 이상 쓰지 않음 —
+//  양끝 다 현재 mesh.position을 그대로 읽으므로 투영/간격 변경에 자동 반영됨.)
+function buildBridgesT(d) {
   if (bridgeLines) { scene.remove(bridgeLines); bridgeLines.geometry.dispose(); }
+  const kwIdx = {};
+  d.keywords.forEach((k, j) => { kwIdx[k.id] = j; });
   const positions = [], colors = [];
   d.papers.forEach((p, i) => {
     const m = paperMeshes[i];
     if (!m) return;
     const c = wColor(p.wn);
-    positions.push(m.position.x, m.position.y, m.position.z);
-    colors.push(c.r, c.g, c.b);
-    // 개념 중심의 현재 투영 위치
-    const kx = (p.kx + (p.px - p.kx) * t) * 120;
-    const ky = (p.ky + (p.py - p.ky) * t) * 120 - layerSep * (1 - t);
-    const kz = (p.kz + (p.pz - p.kz) * t) * 120;
-    positions.push(kx, ky, kz);
-    colors.push(c.r, c.g, c.b);
+    (p.tags || []).forEach(tag => {
+      const j = kwIdx[tag];
+      if (j === undefined || !kwMeshes[j]) return;
+      const kPos = kwMeshes[j].position;
+      positions.push(m.position.x, m.position.y, m.position.z);
+      colors.push(c.r, c.g, c.b);
+      positions.push(kPos.x, kPos.y, kPos.z);
+      colors.push(c.r, c.g, c.b);
+    });
   });
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3));
-  const mat = new THREE.LineBasicMaterial({ vertexColors:true, transparent:true, opacity:0.35 });
+  if (positions.length) {
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3));
+  }
+  const mat = new THREE.LineBasicMaterial({ vertexColors:true, transparent:true, opacity:0.5 });
   bridgeLines = new THREE.LineSegments(geo, mat);
   bridgeLines.visible = showBridges;
   scene.add(bridgeLines);
@@ -353,7 +378,9 @@ window.onSep = function(v) {
       const k = data.keywords[i];
       m.position.y = (k.ky + (k.py - k.ky) * tVal) * 120 - layerSep * (1 - tVal);
     });
-    buildBridgesT(data, tVal);
+    buildBridgesT(data);
+    buildPaperEdges(data.paper_edges);
+    buildKeywordEdges(data.keyword_edges);
   }
 };
 
@@ -398,6 +425,7 @@ renderer.domElement.addEventListener('mousemove', e => {
 
 function checkHover() {
   if (!data) return;
+  if (dragTarget || isBoxSelecting) { tooltip.style.display = 'none'; return; }
   raycaster.setFromCamera(mouse, camera);
   const all = [...paperMeshes, ...kwMeshes].filter(m => m.visible);
   const hits = raycaster.intersectObjects(all);
@@ -421,6 +449,202 @@ function checkHover() {
     tooltip.style.display = 'none';
   }
 }
+
+// ── 노드 드래그 = 4D 위치 보정 (t=0, 논문 레이어에서만) ─────────────────
+// 계산된 좌표가 원본, 사용자가 옮기면 그 위에 얹는 보정값으로 취급한다.
+// 서버(SQLite)에 slug·좌표·보정자·시각을 저장해 누구든 다음 로드부터 반영받는다.
+// Shift+드래그로 박스 선택 → 여러 노드를 그룹으로 한 번에 보정할 수도 있다.
+let dragTarget = null;
+const dragPlane  = new THREE.Plane();
+const dragPoint  = new THREE.Vector3();
+const dragOffset = new THREE.Vector3();
+
+let selectedIds = new Set();
+let isBoxSelecting = false;
+let boxStart = { x: 0, y: 0 };
+let boxCurrent = { x: 0, y: 0 };
+let groupDragOffsets = null;  // Map<paperId, THREE.Vector3 월드 오프셋>
+const selRectEl = document.getElementById('selRect');
+
+function setMouseFromEvent(e) {
+  mouse.x =  (e.clientX / innerWidth)  * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+}
+
+function meshById(id) {
+  return paperMeshes.find(m => m.userData.d.id === id);
+}
+
+function toScreen(worldPos) {
+  const v = worldPos.clone().project(camera);
+  return { x: (v.x + 1) / 2 * innerWidth, y: (-v.y + 1) / 2 * innerHeight };
+}
+
+function updateSelRectDOM() {
+  const x1 = Math.min(boxStart.x, boxCurrent.x);
+  const y1 = Math.min(boxStart.y, boxCurrent.y);
+  selRectEl.style.left   = x1 + 'px';
+  selRectEl.style.top    = y1 + 'px';
+  selRectEl.style.width  = Math.abs(boxCurrent.x - boxStart.x) + 'px';
+  selRectEl.style.height = Math.abs(boxCurrent.y - boxStart.y) + 'px';
+}
+
+function updateSelectionVisual() {
+  paperMeshes.forEach(m => {
+    if (selectedIds.size === 0) {
+      m.material.opacity = 0.9;
+      m.scale.setScalar(1);
+    } else if (selectedIds.has(m.userData.d.id)) {
+      m.material.opacity = 1.0;
+      m.scale.setScalar(1.4);
+    } else {
+      m.material.opacity = 0.2;
+      m.scale.setScalar(1);
+    }
+  });
+}
+
+function pickNodesInBox() {
+  const x1 = Math.min(boxStart.x, boxCurrent.x), x2 = Math.max(boxStart.x, boxCurrent.x);
+  const y1 = Math.min(boxStart.y, boxCurrent.y), y2 = Math.max(boxStart.y, boxCurrent.y);
+  selectedIds.clear();
+  const wp = new THREE.Vector3();
+  paperMeshes.forEach(m => {
+    if (!m.visible) return;
+    m.getWorldPosition(wp);
+    const s = toScreen(wp);
+    if (s.x >= x1 && s.x <= x2 && s.y >= y1 && s.y <= y2) selectedIds.add(m.userData.d.id);
+  });
+  updateSelectionVisual();
+}
+
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (tVal !== 0 || !showPapers) return;  // 투영 중엔 "논문 위치"가 아니므로 보정 비활성
+
+  if (e.shiftKey) {
+    isBoxSelecting = true;
+    boxStart = boxCurrent = { x: e.clientX, y: e.clientY };
+    selRectEl.style.display = 'block';
+    updateSelRectDOM();
+    controls.enabled = false;
+    return;
+  }
+
+  setMouseFromEvent(e);
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(paperMeshes.filter(m => m.visible));
+  if (!hits.length) {
+    if (selectedIds.size) { selectedIds.clear(); updateSelectionVisual(); }
+    return;
+  }
+  dragTarget = hits[0].object;
+  const nodeId = dragTarget.userData.d.id;
+  controls.enabled = false;
+  // scene이 자동회전 중이면 mesh.position(로컬)과 레이캐스터 결과(월드)가 어긋나므로
+  // 전 과정을 월드 좌표로 계산하고 최종 대입 시점에만 로컬로 변환한다.
+  const targetWorldPos = new THREE.Vector3();
+  dragTarget.getWorldPosition(targetWorldPos);
+  const normal = new THREE.Vector3();
+  camera.getWorldDirection(normal);
+  dragPlane.setFromNormalAndCoplanarPoint(normal, targetWorldPos);
+  raycaster.ray.intersectPlane(dragPlane, dragPoint);
+  dragOffset.copy(targetWorldPos).sub(dragPoint);  // 월드 좌표 기준 오프셋
+
+  if (selectedIds.has(nodeId) && selectedIds.size > 1) {
+    // 이미 선택된 그룹 안의 노드를 잡으면 그룹 전체를 함께 옮긴다
+    groupDragOffsets = new Map();
+    selectedIds.forEach(id => {
+      const m = meshById(id);
+      if (!m) return;
+      const wp = new THREE.Vector3();
+      m.getWorldPosition(wp);
+      groupDragOffsets.set(id, wp.sub(targetWorldPos));
+    });
+    document.getElementById('status').textContent = `${selectedIds.size}개 그룹 보정 중... 놓으면 저장됩니다`;
+  } else {
+    selectedIds.clear();
+    updateSelectionVisual();
+    groupDragOffsets = null;
+    document.getElementById('status').textContent = '보정 중... 놓으면 저장됩니다';
+  }
+  tooltip.style.display = 'none';
+});
+
+renderer.domElement.addEventListener('pointermove', e => {
+  setMouseFromEvent(e);
+
+  if (isBoxSelecting) {
+    boxCurrent = { x: e.clientX, y: e.clientY };
+    updateSelRectDOM();
+    return;
+  }
+  if (!dragTarget) return;
+
+  raycaster.setFromCamera(mouse, camera);
+  if (!raycaster.ray.intersectPlane(dragPlane, dragPoint)) return;
+  const newWorldPos = dragPoint.clone().add(dragOffset);
+
+  if (groupDragOffsets) {
+    groupDragOffsets.forEach((offset, id) => {
+      const m = meshById(id);
+      if (!m) return;
+      const wp = newWorldPos.clone().add(offset);
+      m.position.copy(m.parent.worldToLocal(wp));
+    });
+  } else {
+    dragTarget.position.copy(dragTarget.parent.worldToLocal(newWorldPos));
+  }
+
+  if (data) {
+    buildBridgesT(data);
+    buildPaperEdges(data.paper_edges);
+  }
+});
+
+window.addEventListener('pointerup', e => {
+  if (isBoxSelecting) {
+    isBoxSelecting = false;
+    selRectEl.style.display = 'none';
+    controls.enabled = true;
+    boxCurrent = { x: e.clientX, y: e.clientY };  // 마지막 pointermove 이후 놓인 지점까지 반영
+    pickNodesInBox();
+    return;
+  }
+  if (!dragTarget) return;
+
+  const correctedBy = correctorInput.value.trim() || '익명';
+  localStorage.setItem('viz4d_corrector', correctedBy);
+  const targetIds = groupDragOffsets ? Array.from(groupDragOffsets.keys()) : [dragTarget.userData.d.id];
+  let savedCount = 0;
+
+  targetIds.forEach(id => {
+    const m = meshById(id);
+    if (!m) return;
+    const idx = paperMeshes.indexOf(m);
+    const p = data.papers[idx];
+    p.px = m.position.x / 120;
+    p.py = (m.position.y - layerSep) / 120;
+    p.pz = m.position.z / 120;
+    fetch('/viz4d/correction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: p.id, x: p.px, y: p.py, z: p.pz, corrected_by: correctedBy }),
+    })
+      .then(() => {
+        savedCount++;
+        document.getElementById('status').textContent = targetIds.length > 1
+          ? `보정 저장됨 · ${savedCount}/${targetIds.length}개 (그룹) → ${correctedBy}`
+          : `보정 저장됨 · ${p.title.slice(0,24)}… → ${correctedBy}`;
+      })
+      .catch(() => {
+        document.getElementById('status').textContent = '보정 저장 실패 (네트워크)';
+      });
+  });
+
+  dragTarget = null;
+  groupDragOffsets = null;
+  controls.enabled = true;
+});
 
 // ── 애니메이션 루프 ─────────────────────────────────────────────────
 let frame = 0;
