@@ -374,6 +374,7 @@ def layout_invalidate():
 
 # ── 실시간 활동 피드 (PostToolUse 훅이 append하는 jsonl) ──────────────────
 ACTIVITY_LOG_PATH = "/home/moos/.hb5u_activity/moojoco_activity.jsonl"
+VORNO_LOG_PATH    = "/home/moos/dev_ws/activity_vorno.jsonl"
 
 
 @app.get("/activity/moojoco")
@@ -382,6 +383,24 @@ def activity_moojoco(limit: int = Query(50, ge=1, le=500)):
         return {"entries": []}
     entries = []
     with open(ACTIVITY_LOG_PATH, "r") as f:
+        lines = f.readlines()[-limit:]
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entries.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return {"entries": entries}
+
+
+@app.get("/activity/vorno")
+def activity_vorno(limit: int = Query(50, ge=1, le=500)):
+    if not os.path.exists(VORNO_LOG_PATH):
+        return {"entries": []}
+    entries = []
+    with open(VORNO_LOG_PATH, "r") as f:
         lines = f.readlines()[-limit:]
     for line in lines:
         line = line.strip()
@@ -542,32 +561,59 @@ def viz_4d_page():
 
 
 _ACTIVITY_HTML = """<!doctype html><html lang="ko"><head><meta charset="utf-8">
-<title>Moojoco 활동 피드</title>
+<title>ROOPS 멀티 에이전트 실시간 활동 피드</title>
 <style>
 body{background:#0f1216;color:#e8eaeb;font-family:ui-monospace,"SF Mono",Consolas,monospace;margin:0;padding:2rem;}
 h1{font-size:1.1rem;color:#ff8a3d;margin-bottom:1rem;}
-#log{max-width:900px;}
-.row{display:flex;gap:1rem;padding:.4rem 0;border-bottom:1px solid #2a3038;font-size:.85rem;}
-.ts{color:#616a74;white-space:nowrap;}
-.tool{color:#45c7ba;white-space:nowrap;width:4.5em;}
-.summary{color:#e8eaeb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#log{max-width:980px;}
+.row{display:flex;gap:1rem;padding:.4rem 0;border-bottom:1px solid #2a3038;font-size:.85rem;align-items:center;}
+.ts{color:#616a74;white-space:nowrap;font-size:.80rem;}
+.agent{font-weight:bold;white-space:nowrap;padding:2px 6px;border-radius:4px;font-size:.75rem;}
+.agent-moojoco{background:#4c1d0b;color:#ff8a3d;border:1px solid #7c2d12;}
+.agent-vorno{background:#064e3b;color:#34d399;border:1px solid #047857;}
+.tool{color:#45c7ba;white-space:nowrap;min-width:6em;}
+.summary{color:#e8eaeb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
 #empty{color:#616a74;}
 </style></head><body>
-<h1>Moojoco 실시간 활동 피드 (10초 폴링)</h1>
+<h1>⚡ ROOPS 멀티 에이전트 실시간 활동 피드 (UTC 기록 → KST+9h 표기)</h1>
 <div id="log"><span id="empty">로딩 중...</span></div>
 <script>
+function toKSTString(tsStr){
+  if(!tsStr) return '';
+  try {
+    let raw = tsStr.trim();
+    if(!raw.includes('Z') && !raw.includes('+')){
+      raw = raw + 'Z';
+    }
+    const d = new Date(raw);
+    if(isNaN(d.getTime())) return tsStr;
+    const kst = new Date(d.getTime() + (9 * 3600 * 1000));
+    return kst.toISOString().replace('T', ' ').substring(0, 19) + ' (KST)';
+  } catch(e) {
+    return tsStr;
+  }
+}
+
 async function refresh(){
   try{
-    const res = await fetch('/activity/moojoco?limit=50');
-    const data = await res.json();
+    const [resM, resV] = await Promise.all([
+      fetch('/activity/moojoco?limit=50').then(r => r.json()).catch(() => ({entries:[]})),
+      fetch('/activity/vorno?limit=50').then(r => r.json()).catch(() => ({entries:[]}))
+    ]);
+    const entriesM = (resM.entries || []).map(e => ({...e, agent: e.agent || 'moojoco'}));
+    const entriesV = (resV.entries || []).map(e => ({...e, agent: e.agent || 'vorno'}));
+    const all = [...entriesM, ...entriesV].sort((a,b) => (a.ts || '').localeCompare(b.ts || ''));
+    
     const el = document.getElementById('log');
-    if(!data.entries || data.entries.length === 0){
+    if(all.length === 0){
       el.innerHTML = '<span id="empty">아직 활동 기록 없음</span>';
       return;
     }
-    el.innerHTML = data.entries.slice().reverse().map(e =>
-      `<div class="row"><span class="ts">${(e.ts||'').replace('T',' ').replace('Z','')}</span><span class="tool">${e.tool||''}</span><span class="summary">${e.summary||''}</span></div>`
-    ).join('');
+    el.innerHTML = all.slice().reverse().map(e => {
+      const agentClass = e.agent === 'vorno' ? 'agent-vorno' : 'agent-moojoco';
+      const kstFormatted = toKSTString(e.ts);
+      return `<div class="row"><span class="ts">${kstFormatted}</span><span class="agent ${agentClass}">[${e.agent}]</span><span class="tool">${e.tool||''}</span><span class="summary">${e.summary||''}</span></div>`;
+    }).join('');
   }catch(e){}
 }
 refresh();
