@@ -37,8 +37,9 @@ curl -s "https://ntfy.hyperbook.com/roops-moojoco/json?poll=1&since=24h" \
 
 ### Step 2 — Memory API 상태 조회
 ```bash
+source ~/.env_roops
 curl -s https://egs2.hyperbook.com/health \
-  -H "x-api-key: frkqjEGTuz70eZvqZ5_GDreXt_5jgPkr4FSG8kyCVHc"
+  -H "x-api-key: $MEMORY_API_KEY_MOOJOCO"
 ```
 - 최근 저장된 메모리를 확인하고 현재 미션 컨텍스트를 파악한다.
 - ⚠️ `GET /memories`는 404 확인됨(2026-07-03) — 조회용 엔드포인트 미확정, `/health`로 우선 상태만 확인
@@ -79,8 +80,9 @@ curl -s "https://ec2.hyperbook.com/rhms/bootstrap?agent=moojoco&hint=session" \
 
 ### Step 2 — Memory API handoff 저장
 ```bash
-curl -s -X POST https://egs2.hyperbook.com/msg \
-  -H "x-api-key: frkqjEGTuz70eZvqZ5_GDreXt_5jgPkr4FSG8kyCVHc" \
+source ~/.env_roops
+curl -s -X POST "https://egs2.hyperbook.com/msg?agent=moojoco" \
+  -H "x-api-key: $MEMORY_API_KEY_MOOJOCO" \
   -H "Content-Type: application/json" \
   -d '{"from_agent":"moojoco","to_agent":"aegis","body":"[Moojoco EOD] <날짜> 세션 요약: <내용>. 다음 우선순위: <항목>"}'
 ```
