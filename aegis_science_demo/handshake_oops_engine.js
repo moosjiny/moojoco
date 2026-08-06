@@ -1,16 +1,37 @@
 /**
  * ROOPS (Robot Object-Oriented Programming System - OOPS)
  * Sub-Object Modular Architecture for Humanoid Robot Hands
- * Dual Internal (Instance State) & External (LocalStorage & Network Sync) Coordinate Linking
+ * Enhanced Prominent TCP 3-Axis RGB Frame Helper & Selection Highlight
  * Author: Aegis
  */
 
 class TcpFrameAxes {
-  constructor(size = 3.5) {
+  constructor(size = 5.0) {
+    this.group = new THREE.Group();
+
+    // Prominent Axes Helper (Red=X, Green=Y, Blue=Z)
     this.axesHelper = new THREE.AxesHelper(size);
+    this.group.add(this.axesHelper);
+
+    // Explicit RGB Arrow Helpers for 100% Visibility
+    const origin = new THREE.Vector3(0, 0, 0);
+    const arrowX = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), origin, size, 0xff0000, 1.2, 0.6); // Red X
+    const arrowY = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), origin, size, 0x00ff00, 1.2, 0.6); // Green Y
+    const arrowZ = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), origin, size, 0x0000ff, 1.2, 0.6); // Blue Z
+
+    this.group.add(arrowX);
+    this.group.add(arrowY);
+    this.group.add(arrowZ);
+
+    this.group.visible = true; // Always visible on hand
   }
+
+  setVisible(visible) {
+    this.group.visible = visible;
+  }
+
   getMesh() {
-    return this.axesHelper;
+    return this.group;
   }
 }
 
@@ -98,7 +119,6 @@ class RobotHandObject {
     this.group = new THREE.Group();
     this.group.name = name;
 
-    // Internal OOPS State Encapsulation (내부 객체 상태)
     this.internalState = {
       px: isFacingRotated ? 0.25 : -0.25,
       py: 3.0,
@@ -115,13 +135,13 @@ class RobotHandObject {
     this.group.add(this.palm.getMesh());
 
     // Sub-Object 2: Selection Highlight Wireframe Box
-    const selectGeo = new THREE.BoxGeometry(4.2, 1.8, 3.2);
+    const selectGeo = new THREE.BoxGeometry(4.4, 2.0, 3.4);
     const selectMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, wireframe: true, visible: false });
     this.selectMesh = new THREE.Mesh(selectGeo, selectMat);
     this.group.add(this.selectMesh);
 
-    // Sub-Object 3: TCP RGB Frame Axes
-    this.tcpAxes = new TcpFrameAxes(3.5);
+    // Sub-Object 3: ENHANCED PROMINENT TCP RGB FRAME AXES
+    this.tcpAxes = new TcpFrameAxes(5.5);
     this.group.add(this.tcpAxes.getMesh());
 
     // Sub-Objects 4: 5 Finger Joint Links
@@ -146,7 +166,6 @@ class RobotHandObject {
     }
   }
 
-  // INTERNAL OBJECT STATE SYNC (객체 내부 연계)
   syncInternalState() {
     this.internalState.px = this.group.position.x;
     this.internalState.py = this.group.position.y;
@@ -158,12 +177,10 @@ class RobotHandObject {
     return this.internalState;
   }
 
-  // EXTERNAL STORAGE & NETWORK DUAL SYNC (외부 저장소 및 타 에이전트 연계)
   exportToExternal() {
     this.syncInternalState();
     const storageKey = (this.name === "Hand A") ? "tcp_handA" : "tcp_handB";
     localStorage.setItem(storageKey, JSON.stringify(this.internalState));
-    console.log(`[ROOPS OOPS] ${this.name} Coordinates Linked to External Storage:`, this.internalState);
     return this.internalState;
   }
 
@@ -175,14 +192,14 @@ class RobotHandObject {
       this.setPosition(data.px, data.py, data.pz);
       this.setRotation(data.rx, data.ry, data.rz);
       this.internalState = data;
-      console.log(`[ROOPS OOPS] ${this.name} Coordinates Restored from External Storage:`, data);
       return true;
     }
     return false;
   }
 
   setHighlight(visible) {
-    this.selectMesh.material.visible = visible;
+    this.selectMesh.material.visible = visible; // Yellow Bounding Wireframe
+    this.tcpAxes.setVisible(true); // Prominent TCP RGB Axes always highlighted!
   }
 
   setPosition(x, y, z) {
