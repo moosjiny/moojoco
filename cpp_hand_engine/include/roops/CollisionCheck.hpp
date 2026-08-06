@@ -56,16 +56,27 @@ inline double closestPtSegmentSegment(const Vec3& p1, const Vec3& q1, const Vec3
 inline std::vector<CapsulePrimitive> collectCapsules(const HumanoidHandObject& hand) {
     std::vector<CapsulePrimitive> caps;
 
-    // Palm: a real capsule spanning the palm's width (its longest axis), with radius
-    // covering only the thin height/depth cross-section. Folding the width into the
-    // radius of a single degenerate point-capsule (as an earlier version did) inflated
-    // the palm into a sphere far larger than the actual flat plate, which made the
-    // trajectory slider report "collision" long before the palms were anywhere near touching.
+    // Palm: a chain of 3 parallel capsules spanning the palm's width (its longest axis),
+    // offset along depth, with radius = height/2 (the palm's actual half-thickness).
+    //
+    // A single capsule with an isotropic radius cannot tightly bound a flat rectangular
+    // cross-section (height x depth) in every direction at once: sizing the radius from
+    // the height/depth diagonal (an earlier version of this fix) makes it accurate for a
+    // diagonal approach but wildly conservative for a pure height-axis (Y) approach --
+    // pure-Y separation falsely reported "collision" out to a 2.68-unit gap when the real
+    // palms (0.6 half-thickness each) only touch at a 1.2-unit gap. Chaining 3 capsules
+    // along depth, each with the *exact* half-thickness as its radius, bounds the palm's
+    // Y-extent exactly while covering its Z-extent via the chain's span (adjacent capsules
+    // are spaced by 2*radius, i.e. exactly tangent, so the chain has no gaps).
     double halfWidth = hand.palm.width * 0.5;
-    Vec3 palmLeft = hand.palm.worldTransform.transformPoint(Vec3(-halfWidth, 0.0, 0.0));
-    Vec3 palmRight = hand.palm.worldTransform.transformPoint(Vec3(halfWidth, 0.0, 0.0));
-    double palmRadius = 0.5 * std::sqrt(hand.palm.height * hand.palm.height + hand.palm.depth * hand.palm.depth);
-    caps.push_back({hand.name + "/palm", palmLeft, palmRight, palmRadius});
+    double crossRadius = hand.palm.height * 0.5;
+    double zInset = std::max(0.0, hand.palm.depth * 0.5 - crossRadius);
+    for (double zOff : {-zInset, 0.0, zInset}) {
+        Vec3 palmLeft = hand.palm.worldTransform.transformPoint(Vec3(-halfWidth, 0.0, zOff));
+        Vec3 palmRight = hand.palm.worldTransform.transformPoint(Vec3(halfWidth, 0.0, zOff));
+        caps.push_back({hand.name + "/palm", palmLeft, palmRight, crossRadius});
+        if (zInset == 0.0) break; // depth <= height: a single centered capsule already covers it
+    }
 
     for (const auto& f : hand.fingers) {
         for (const auto& seg : f.segments) {
