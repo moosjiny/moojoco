@@ -5,6 +5,11 @@
 #include <QHBoxLayout>
 #include <QGroupBox>
 #include <QDockWidget>
+#include <QFileDialog>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QFile>
+#include <QDir>
 #include <algorithm>
 #include <cmath>
 
@@ -79,6 +84,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     poseRow->addWidget(handBPoseGroup);
 
     poseLayout->addLayout(poseRow);
+
+    m_savePoseButton = new QPushButton("Save Pose...", poseGroup);
+    poseLayout->addWidget(m_savePoseButton);
+    connect(m_savePoseButton, &QPushButton::clicked, this, &MainWindow::onSavePoseClicked);
+
     layout->addWidget(poseGroup);
 
     connect(m_positionOverrideCheck, &QCheckBox::toggled, this, &MainWindow::onPositionOverrideToggled);
@@ -203,6 +213,35 @@ void MainWindow::onPositionOverrideToggled(bool checked) {
     } else {
         onTrajectorySliderChanged(m_trajectorySlider->value()); // hand pose control back to the trajectory
     }
+}
+
+void MainWindow::onSavePoseClicked() {
+    QString path = QFileDialog::getSaveFileName(this, "Save Hand Pose",
+                                                  QDir::homePath() + "/hand_pose.json",
+                                                  "JSON Files (*.json)");
+    if (path.isEmpty()) return;
+
+    auto poseToJson = [](QDoubleSpinBox* pos[3], QDoubleSpinBox* rot[3]) {
+        QJsonObject o;
+        o["x"] = pos[0]->value();  o["y"] = pos[1]->value();  o["z"] = pos[2]->value();
+        o["rx"] = rot[0]->value(); o["ry"] = rot[1]->value(); o["rz"] = rot[2]->value();
+        return o;
+    };
+    QJsonObject root;
+    root["handA"] = poseToJson(m_posSpinA, m_rotSpinA);
+    root["handB"] = poseToJson(m_posSpinB, m_rotSpinB);
+
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) {
+        m_collisionLabel->setStyleSheet("color: #dc2626; font-weight: bold;");
+        m_collisionLabel->setText("Failed to save pose: " + file.errorString());
+        return;
+    }
+    file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+    file.close();
+
+    m_collisionLabel->setStyleSheet("color: #2563eb; font-weight: bold;");
+    m_collisionLabel->setText("Pose saved to " + path);
 }
 
 void MainWindow::onThumbOppositionChanged(int value) {
