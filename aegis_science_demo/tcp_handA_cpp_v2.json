@@ -2,7 +2,7 @@
   "handName": "Hand A",
   "px": -0.25, "py": 3, "pz": -1.35,
   "rx": 0, "ry": 0, "rz": 0,
-  "lastUpdated": 1785978528176,
+  "lastUpdated": 1785982265824,
   "fingers": [
     { "name": "thumb", "isThumb": true, "segments": [
       { "name": "thumb_metacarpal", "jointAngleDeg": 23.1848, "tip": [-2.02753, 2.64567, 0.458043] },
