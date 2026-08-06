@@ -56,11 +56,16 @@ inline double closestPtSegmentSegment(const Vec3& p1, const Vec3& q1, const Vec3
 inline std::vector<CapsulePrimitive> collectCapsules(const HumanoidHandObject& hand) {
     std::vector<CapsulePrimitive> caps;
 
-    // Palm: approximated as a single sphere (degenerate capsule) at the wrist origin,
-    // radius bounding the palm box's footprint.
-    Vec3 palmCenter = hand.palm.worldTransform.translationPart();
-    double palmRadius = 0.5 * std::sqrt(hand.palm.width * hand.palm.width + hand.palm.depth * hand.palm.depth);
-    caps.push_back({hand.name + "/palm", palmCenter, palmCenter, palmRadius});
+    // Palm: a real capsule spanning the palm's width (its longest axis), with radius
+    // covering only the thin height/depth cross-section. Folding the width into the
+    // radius of a single degenerate point-capsule (as an earlier version did) inflated
+    // the palm into a sphere far larger than the actual flat plate, which made the
+    // trajectory slider report "collision" long before the palms were anywhere near touching.
+    double halfWidth = hand.palm.width * 0.5;
+    Vec3 palmLeft = hand.palm.worldTransform.transformPoint(Vec3(-halfWidth, 0.0, 0.0));
+    Vec3 palmRight = hand.palm.worldTransform.transformPoint(Vec3(halfWidth, 0.0, 0.0));
+    double palmRadius = 0.5 * std::sqrt(hand.palm.height * hand.palm.height + hand.palm.depth * hand.palm.depth);
+    caps.push_back({hand.name + "/palm", palmLeft, palmRight, palmRadius});
 
     for (const auto& f : hand.fingers) {
         for (const auto& seg : f.segments) {
