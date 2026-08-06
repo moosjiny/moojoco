@@ -86,6 +86,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_statusLabel = new QLabel(panel);
     m_statusLabel->setWordWrap(true);
     layout->addWidget(m_statusLabel);
+
+    m_collisionLabel = new QLabel(panel);
+    m_collisionLabel->setWordWrap(true);
+    layout->addWidget(m_collisionLabel);
     layout->addStretch();
 
     dock->setWidget(panel);
@@ -219,10 +223,46 @@ void MainWindow::onFingerSliderChanged() {
 void MainWindow::recompute() {
     m_handA->computeForwardKinematics();
     m_handB->computeForwardKinematics();
+    updateCollisionGuard(); // may revert a manual drag that would cause hand-vs-hand overlap
     m_glWidget->refreshFromEngine();
 
     QString mode = m_manualOverride ? "manual per-finger override" : "trajectory-driven";
     m_statusLabel->setText(QString("Mode: %1 | MCP/PIP/DIP anatomical chain active, DIP coupled to PIP at %2x")
                                 .arg(mode)
                                 .arg(m_handA->fingers[1].dipToPipCoupling));
+}
+
+void MainWindow::updateCollisionGuard() {
+    auto result = roops::checkHandCollision(*m_handA, *m_handB);
+
+    if (result.colliding && m_positionOverride) {
+        // A manual drag pushed the hands into each other — revert to the last verified
+        // non-colliding wrist pose rather than letting the geometry pass through itself.
+        m_handA->position = m_lastValidPosA;
+        m_handA->rotation = m_lastValidRotA;
+        m_handB->position = m_lastValidPosB;
+        m_handB->rotation = m_lastValidRotB;
+        m_handA->computeForwardKinematics();
+        m_handB->computeForwardKinematics();
+        syncPoseSpinboxes();
+
+        m_collisionLabel->setStyleSheet("color: #dc2626; font-weight: bold;");
+        m_collisionLabel->setText(QString("Collision blocked: %1 vs %2 (overlap %3) — pose reverted")
+                                       .arg(QString::fromStdString(result.partA))
+                                       .arg(QString::fromStdString(result.partB))
+                                       .arg(result.worstPenetration, 0, 'f', 3));
+    } else if (result.colliding) {
+        // Trajectory/grasp-driven contact (e.g. interlocking fingers during a clasp) is
+        // expected during a handshake, so this is reported but not blocked.
+        m_collisionLabel->setStyleSheet("color: #d97706; font-weight: bold;");
+        m_collisionLabel->setText(QString("Contact: %1 vs %2 (overlap %3)")
+                                       .arg(QString::fromStdString(result.partA))
+                                       .arg(QString::fromStdString(result.partB))
+                                       .arg(result.worstPenetration, 0, 'f', 3));
+    } else {
+        m_lastValidPosA = m_handA->position; m_lastValidRotA = m_handA->rotation;
+        m_lastValidPosB = m_handB->position; m_lastValidRotB = m_handB->rotation;
+        m_collisionLabel->setStyleSheet("color: #16a34a;");
+        m_collisionLabel->setText("No collision (min gap OK)");
+    }
 }

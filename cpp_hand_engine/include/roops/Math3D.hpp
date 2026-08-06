@@ -15,6 +15,9 @@ struct Vec3 {
     Vec3 operator+(const Vec3& o) const { return {x + o.x, y + o.y, z + o.z}; }
     Vec3 operator-(const Vec3& o) const { return {x - o.x, y - o.y, z - o.z}; }
     Vec3 operator*(double s) const { return {x * s, y * s, z * s}; }
+
+    double dot(const Vec3& o) const { return x * o.x + y * o.y + z * o.z; }
+    double length() const { return std::sqrt(dot(*this)); }
 };
 
 // 4x4 matrix, column-major storage: m[col*4 + row]

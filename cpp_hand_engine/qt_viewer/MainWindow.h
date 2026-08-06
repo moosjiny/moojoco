@@ -7,6 +7,7 @@
 #include <QFormLayout>
 #include <memory>
 #include "roops/HumanHandKinematics.hpp"
+#include "roops/CollisionCheck.hpp"
 
 class HandGLWidget;
 
@@ -54,4 +55,10 @@ private:
     QSlider* m_posSliderB[3] = {nullptr, nullptr, nullptr};
     QSlider* m_rotSliderB[3] = {nullptr, nullptr, nullptr};
     bool m_positionOverride = false;
+
+    // Real geometric collision guard (roops::checkHandCollision): the last wrist pose that
+    // was verified non-colliding, so a manual drag that would cause overlap can be reverted.
+    QLabel* m_collisionLabel = nullptr;
+    roops::Vec3 m_lastValidPosA, m_lastValidRotA, m_lastValidPosB, m_lastValidRotB;
+    void updateCollisionGuard();
 };
