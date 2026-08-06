@@ -85,9 +85,14 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
     poseLayout->addLayout(poseRow);
 
+    auto* poseIoRow = new QHBoxLayout();
     m_savePoseButton = new QPushButton("Save Pose...", poseGroup);
-    poseLayout->addWidget(m_savePoseButton);
+    m_loadPoseButton = new QPushButton("Load Pose...", poseGroup);
+    poseIoRow->addWidget(m_savePoseButton);
+    poseIoRow->addWidget(m_loadPoseButton);
+    poseLayout->addLayout(poseIoRow);
     connect(m_savePoseButton, &QPushButton::clicked, this, &MainWindow::onSavePoseClicked);
+    connect(m_loadPoseButton, &QPushButton::clicked, this, &MainWindow::onLoadPoseClicked);
 
     layout->addWidget(poseGroup);
 
@@ -242,6 +247,57 @@ void MainWindow::onSavePoseClicked() {
 
     m_collisionLabel->setStyleSheet("color: #2563eb; font-weight: bold;");
     m_collisionLabel->setText("Pose saved to " + path);
+}
+
+void MainWindow::onLoadPoseClicked() {
+    QString path = QFileDialog::getOpenFileName(this, "Load Hand Pose",
+                                                   QDir::homePath(),
+                                                   "JSON Files (*.json)");
+    if (path.isEmpty()) return;
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        m_collisionLabel->setStyleSheet("color: #dc2626; font-weight: bold;");
+        m_collisionLabel->setText("Failed to load pose: " + file.errorString());
+        return;
+    }
+    QJsonParseError err;
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &err);
+    file.close();
+    if (err.error != QJsonParseError::NoError || !doc.isObject()
+        || !doc.object().contains("handA") || !doc.object().contains("handB")) {
+        m_collisionLabel->setStyleSheet("color: #dc2626; font-weight: bold;");
+        m_collisionLabel->setText("Failed to load pose: invalid JSON (" + err.errorString() + ")");
+        return;
+    }
+
+    if (!m_positionOverrideCheck->isChecked()) {
+        m_positionOverrideCheck->blockSignals(true);
+        m_positionOverrideCheck->setChecked(true);
+        m_positionOverrideCheck->blockSignals(false);
+        m_positionOverride = true;
+    }
+
+    // Apply both hands' poses to the engine directly (rather than through the spinboxes one
+    // field at a time), so recompute()/the collision guard only ever sees the fully-loaded
+    // pose -- not an inconsistent halfway state where e.g. Hand A already moved but Hand B
+    // hasn't, which could trigger a spurious revert.
+    auto applyPose = [](const QJsonObject& o, roops::HumanoidHandObject* hand) {
+        hand->setPosition(o["x"].toDouble(), o["y"].toDouble(), o["z"].toDouble());
+        hand->setRotation(o["rx"].toDouble() * M_PI / 180.0,
+                           o["ry"].toDouble() * M_PI / 180.0,
+                           o["rz"].toDouble() * M_PI / 180.0);
+    };
+    applyPose(doc.object()["handA"].toObject(), m_handA.get());
+    applyPose(doc.object()["handB"].toObject(), m_handB.get());
+
+    recompute(); // may revert via the collision guard if the loaded pose overlaps
+    syncPoseSpinboxes();
+
+    if (!m_collisionLabel->text().startsWith("Collision blocked")) {
+        m_collisionLabel->setStyleSheet("color: #2563eb; font-weight: bold;");
+        m_collisionLabel->setText("Pose loaded from " + path);
+    }
 }
 
 void MainWindow::onThumbOppositionChanged(int value) {

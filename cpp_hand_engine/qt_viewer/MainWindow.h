@@ -24,6 +24,7 @@ private slots:
     void onManualPoseChanged();
     void onPositionOverrideToggled(bool checked);
     void onSavePoseClicked();
+    void onLoadPoseClicked();
 
 private:
     QSlider* addFingerSlider(QWidget* panel, const QString& label);
@@ -58,6 +59,7 @@ private:
     QSlider* m_rotSliderB[3] = {nullptr, nullptr, nullptr};
     bool m_positionOverride = false;
     QPushButton* m_savePoseButton = nullptr;
+    QPushButton* m_loadPoseButton = nullptr;
 
     // Real geometric collision guard (roops::checkHandCollision): the last wrist pose that
     // was verified non-colliding, so a manual drag that would cause overlap can be reverted.
