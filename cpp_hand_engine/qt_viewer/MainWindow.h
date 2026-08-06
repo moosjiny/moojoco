@@ -24,8 +24,9 @@ private slots:
 
 private:
     QSlider* addFingerSlider(QWidget* panel, const QString& label);
-    QDoubleSpinBox* addPoseSpin(QFormLayout* form, const QString& label, double minV, double maxV, double val);
-    void syncPoseSpinboxes(); // reflect engine's current position/rotation into the spinboxes without re-triggering signals
+    QDoubleSpinBox* addPoseSpin(QFormLayout* form, const QString& label, double minV, double maxV, double val,
+                                 double sliderScale, QSlider** sliderOut);
+    void syncPoseSpinboxes(); // reflect engine's current position/rotation into the sliders/spinboxes without re-triggering signals
     void recompute();
 
     std::unique_ptr<roops::HumanoidHandObject> m_handA;
@@ -38,11 +39,19 @@ private:
     QLabel* m_statusLabel = nullptr;
     bool m_manualOverride = false;
 
-    // Manual position/rotation override (X,Y,Z position + RX,RY,RZ rotation in degrees)
+    // Manual position/rotation override (X,Y,Z position + RX,RY,RZ rotation in degrees),
+    // each axis exposed as a linked slider + spinbox pair.
+    static constexpr double kPosSliderScale = 20.0; // slider int = value * 20  (0.05 resolution)
+    static constexpr double kRotSliderScale = 1.0;  // slider int = value * 1  (1 degree resolution)
+
     QCheckBox* m_positionOverrideCheck = nullptr;
     QDoubleSpinBox* m_posSpinA[3] = {nullptr, nullptr, nullptr};
     QDoubleSpinBox* m_rotSpinA[3] = {nullptr, nullptr, nullptr};
     QDoubleSpinBox* m_posSpinB[3] = {nullptr, nullptr, nullptr};
     QDoubleSpinBox* m_rotSpinB[3] = {nullptr, nullptr, nullptr};
+    QSlider* m_posSliderA[3] = {nullptr, nullptr, nullptr};
+    QSlider* m_rotSliderA[3] = {nullptr, nullptr, nullptr};
+    QSlider* m_posSliderB[3] = {nullptr, nullptr, nullptr};
+    QSlider* m_rotSliderB[3] = {nullptr, nullptr, nullptr};
     bool m_positionOverride = false;
 };

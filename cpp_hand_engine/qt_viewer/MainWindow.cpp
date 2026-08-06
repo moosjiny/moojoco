@@ -6,6 +6,7 @@
 #include <QGroupBox>
 #include <QDockWidget>
 #include <algorithm>
+#include <cmath>
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setWindowTitle("ROOPS Humanoid Hand Viewer v2 — Anatomical Finger Joints (Moojoco / hb5u)");
@@ -59,31 +60,27 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
     auto* handAPoseGroup = new QGroupBox("Hand A", poseGroup);
     auto* handAForm = new QFormLayout(handAPoseGroup);
-    m_posSpinA[0] = addPoseSpin(handAForm, "X", -5.0, 5.0, -0.25);
-    m_posSpinA[1] = addPoseSpin(handAForm, "Y", -5.0, 10.0, 3.0);
-    m_posSpinA[2] = addPoseSpin(handAForm, "Z", -5.0, 10.0, -1.35);
-    m_rotSpinA[0] = addPoseSpin(handAForm, "RX (deg)", -180.0, 180.0, 0.0);
-    m_rotSpinA[1] = addPoseSpin(handAForm, "RY (deg)", -180.0, 180.0, 0.0);
-    m_rotSpinA[2] = addPoseSpin(handAForm, "RZ (deg)", -180.0, 180.0, 0.0);
+    m_posSpinA[0] = addPoseSpin(handAForm, "X", -5.0, 5.0, -0.25, kPosSliderScale, &m_posSliderA[0]);
+    m_posSpinA[1] = addPoseSpin(handAForm, "Y", -5.0, 10.0, 3.0, kPosSliderScale, &m_posSliderA[1]);
+    m_posSpinA[2] = addPoseSpin(handAForm, "Z", -5.0, 10.0, -1.35, kPosSliderScale, &m_posSliderA[2]);
+    m_rotSpinA[0] = addPoseSpin(handAForm, "RX (deg)", -180.0, 180.0, 0.0, kRotSliderScale, &m_rotSliderA[0]);
+    m_rotSpinA[1] = addPoseSpin(handAForm, "RY (deg)", -180.0, 180.0, 0.0, kRotSliderScale, &m_rotSliderA[1]);
+    m_rotSpinA[2] = addPoseSpin(handAForm, "RZ (deg)", -180.0, 180.0, 0.0, kRotSliderScale, &m_rotSliderA[2]);
     poseRow->addWidget(handAPoseGroup);
 
     auto* handBPoseGroup = new QGroupBox("Hand B", poseGroup);
     auto* handBForm = new QFormLayout(handBPoseGroup);
-    m_posSpinB[0] = addPoseSpin(handBForm, "X", -5.0, 5.0, 0.25);
-    m_posSpinB[1] = addPoseSpin(handBForm, "Y", -5.0, 10.0, 3.0);
-    m_posSpinB[2] = addPoseSpin(handBForm, "Z", -5.0, 10.0, 1.35);
-    m_rotSpinB[0] = addPoseSpin(handBForm, "RX (deg)", -180.0, 180.0, 0.0);
-    m_rotSpinB[1] = addPoseSpin(handBForm, "RY (deg)", -180.0, 180.0, 180.0);
-    m_rotSpinB[2] = addPoseSpin(handBForm, "RZ (deg)", -180.0, 180.0, 0.0);
+    m_posSpinB[0] = addPoseSpin(handBForm, "X", -5.0, 5.0, 0.25, kPosSliderScale, &m_posSliderB[0]);
+    m_posSpinB[1] = addPoseSpin(handBForm, "Y", -5.0, 10.0, 3.0, kPosSliderScale, &m_posSliderB[1]);
+    m_posSpinB[2] = addPoseSpin(handBForm, "Z", -5.0, 10.0, 1.35, kPosSliderScale, &m_posSliderB[2]);
+    m_rotSpinB[0] = addPoseSpin(handBForm, "RX (deg)", -180.0, 180.0, 0.0, kRotSliderScale, &m_rotSliderB[0]);
+    m_rotSpinB[1] = addPoseSpin(handBForm, "RY (deg)", -180.0, 180.0, 180.0, kRotSliderScale, &m_rotSliderB[1]);
+    m_rotSpinB[2] = addPoseSpin(handBForm, "RZ (deg)", -180.0, 180.0, 0.0, kRotSliderScale, &m_rotSliderB[2]);
     poseRow->addWidget(handBPoseGroup);
 
     poseLayout->addLayout(poseRow);
     layout->addWidget(poseGroup);
 
-    for (auto* s : m_posSpinA) connect(s, &QDoubleSpinBox::valueChanged, this, &MainWindow::onManualPoseChanged);
-    for (auto* s : m_rotSpinA) connect(s, &QDoubleSpinBox::valueChanged, this, &MainWindow::onManualPoseChanged);
-    for (auto* s : m_posSpinB) connect(s, &QDoubleSpinBox::valueChanged, this, &MainWindow::onManualPoseChanged);
-    for (auto* s : m_rotSpinB) connect(s, &QDoubleSpinBox::valueChanged, this, &MainWindow::onManualPoseChanged);
     connect(m_positionOverrideCheck, &QCheckBox::toggled, this, &MainWindow::onPositionOverrideToggled);
 
     m_statusLabel = new QLabel(panel);
@@ -122,18 +119,46 @@ void MainWindow::onTrajectorySliderChanged(int value) {
     recompute();
 }
 
-QDoubleSpinBox* MainWindow::addPoseSpin(QFormLayout* form, const QString& label, double minV, double maxV, double val) {
+QDoubleSpinBox* MainWindow::addPoseSpin(QFormLayout* form, const QString& label, double minV, double maxV, double val,
+                                         double sliderScale, QSlider** sliderOut) {
     auto* spin = new QDoubleSpinBox();
     spin->setRange(minV, maxV);
-    spin->setSingleStep(0.05);
+    spin->setSingleStep(1.0 / sliderScale);
     spin->setDecimals(2);
     spin->setValue(val);
-    form->addRow(label, spin);
+
+    auto* slider = new QSlider(Qt::Horizontal);
+    slider->setRange(int(std::round(minV * sliderScale)), int(std::round(maxV * sliderScale)));
+    slider->setValue(int(std::round(val * sliderScale)));
+
+    auto* row = new QWidget();
+    auto* rowLayout = new QHBoxLayout(row);
+    rowLayout->setContentsMargins(0, 0, 0, 0);
+    rowLayout->addWidget(slider, 1);
+    rowLayout->addWidget(spin);
+    form->addRow(label, row);
+
+    // Keep slider and spinbox mirroring each other, then forward either change to the engine.
+    connect(slider, &QSlider::valueChanged, this, [spin, slider, sliderScale]() {
+        spin->blockSignals(true);
+        spin->setValue(slider->value() / sliderScale);
+        spin->blockSignals(false);
+    });
+    connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [slider, sliderScale](double v) {
+        slider->blockSignals(true);
+        slider->setValue(int(std::round(v * sliderScale)));
+        slider->blockSignals(false);
+    });
+    connect(slider, &QSlider::valueChanged, this, &MainWindow::onManualPoseChanged);
+    connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::onManualPoseChanged);
+
+    if (sliderOut) *sliderOut = slider;
     return spin;
 }
 
 void MainWindow::syncPoseSpinboxes() {
-    auto sync = [](QDoubleSpinBox* posSpin[3], QDoubleSpinBox* rotSpin[3], const roops::HumanoidHandObject* hand) {
+    auto sync = [](QDoubleSpinBox* posSpin[3], QSlider* posSlider[3], QDoubleSpinBox* rotSpin[3], QSlider* rotSlider[3],
+                    const roops::HumanoidHandObject* hand) {
         const roops::Vec3& p = hand->position;
         const roops::Vec3& r = hand->rotation;
         double posVal[3] = {p.x, p.y, p.z};
@@ -142,13 +167,20 @@ void MainWindow::syncPoseSpinboxes() {
             posSpin[i]->blockSignals(true);
             posSpin[i]->setValue(posVal[i]);
             posSpin[i]->blockSignals(false);
+            posSlider[i]->blockSignals(true);
+            posSlider[i]->setValue(int(std::round(posVal[i] * kPosSliderScale)));
+            posSlider[i]->blockSignals(false);
+
             rotSpin[i]->blockSignals(true);
             rotSpin[i]->setValue(rotVal[i]);
             rotSpin[i]->blockSignals(false);
+            rotSlider[i]->blockSignals(true);
+            rotSlider[i]->setValue(int(std::round(rotVal[i] * kRotSliderScale)));
+            rotSlider[i]->blockSignals(false);
         }
     };
-    sync(m_posSpinA, m_rotSpinA, m_handA.get());
-    sync(m_posSpinB, m_rotSpinB, m_handB.get());
+    sync(m_posSpinA, m_posSliderA, m_rotSpinA, m_rotSliderA, m_handA.get());
+    sync(m_posSpinB, m_posSliderB, m_rotSpinB, m_rotSliderB, m_handB.get());
 }
 
 void MainWindow::onManualPoseChanged() {
