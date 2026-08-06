@@ -7,14 +7,13 @@ Moojoco 3D Thesis Viz Server
 - GET /layout/invalidate → 캐시 즉시 무효화
 - GET /viz/thesis-3d → Three.js 3D 시각화 페이지
 """
-import os, threading, time, math, json, requests, sqlite3
-from datetime import datetime, timezone
+import os, threading, time, math, json, requests
 import numpy as np
 import psutil
 import redis
 import pynvml  # nvidia-ml-py 패키지 사용 (pip install nvidia-ml-py)
-from fastapi import FastAPI, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi import FastAPI, Query
+from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn
 
 try:
@@ -22,11 +21,6 @@ try:
     _CUPY_OK = True
 except ImportError:
     _CUPY_OK = False
-
-import subprocess
-from pathlib import Path
-_BINARY = Path(__file__).parent / "layout_engine"
-_BINARY_OK = _BINARY.exists() and _BINARY.is_file()
 
 # ── 설정 ──────────────────────────────────────────────────────────────
 PORT          = 8891
@@ -101,7 +95,7 @@ threading.Thread(target=_heartbeat_loop, daemon=True).start()
 
 # ── Redis 공유 클라이언트 + 레이아웃 캐시 ────────────────────────────
 LAYOUT_CACHE_TTL  = 600   # 레이아웃 결과 캐시 유효기간 (초)
-LAYOUT_CACHE_KEYS = {"network": "layout:network", "keywords": "layout:keywords", "4d": "layout:4d"}
+LAYOUT_CACHE_KEYS = {"network": "layout:network", "keywords": "layout:keywords"}
 
 _redis_shared: "redis.Redis | None" = None
 _redis_shared_lock = threading.Lock()
@@ -225,37 +219,9 @@ def parse_tag(raw):
 
 # ── 3D Force-directed 레이아웃 계산 ───────────────────────────────────
 def force_layout_3d(nodes, edges, iterations=80):
-    if _BINARY_OK:
-        return _force_layout_binary(nodes, edges, iterations)
     if _CUPY_OK:
         return _force_layout_gpu(nodes, edges, iterations)
     return _force_layout_cpu(nodes, edges, iterations)
-
-
-def _force_layout_binary(nodes, edges, iterations=80):
-    """C++ CUDA 바이너리 (layout_engine) 호출 — 가장 빠른 경로."""
-    if not nodes:
-        return nodes
-    payload = json.dumps({"nodes": nodes, "edges": edges, "iterations": iterations})
-    try:
-        result = subprocess.run(
-            [str(_BINARY)],
-            input=payload, capture_output=True, text=True, timeout=30
-        )
-        if result.returncode != 0:
-            print(f"[layout_binary] stderr: {result.stderr.strip()}")
-            return _force_layout_cpu(nodes, edges, iterations)
-        out = json.loads(result.stdout)
-        out_nodes = {nd["id"]: nd for nd in out["nodes"]}
-        for nd in nodes:
-            updated = out_nodes.get(nd["id"])
-            if updated:
-                nd["x"], nd["y"], nd["z"] = updated["x"], updated["y"], updated["z"]
-        print(f"[layout_binary] {len(nodes)}노드 {out.get('ms', 0):.2f}ms (GPU)")
-        return nodes
-    except Exception as e:
-        print(f"[layout_binary] 실패 → CPU fallback: {e}")
-        return _force_layout_cpu(nodes, edges, iterations)
 
 
 def _force_layout_gpu(nodes, edges, iterations=80):
@@ -360,7 +326,7 @@ def health():
         "status": resource_status(cpu, gpu),
         "cpu": round(cpu, 1),
         "gpu": round(gpu, 1),
-        "layout_engine": "cpp-cuda" if _BINARY_OK else ("cupy-gpu" if _CUPY_OK else "numpy-cpu"),
+        "layout_engine": "cupy-gpu" if _CUPY_OK else "numpy-cpu",
         "cache_hits": _cache_stats["hits"],
         "cache_misses": _cache_stats["misses"],
     }
@@ -370,94 +336,6 @@ def health():
 def layout_invalidate():
     deleted = _layout_cache_invalidate()
     return {"deleted": deleted, "keys": list(LAYOUT_CACHE_KEYS.values())}
-
-
-# ── 실시간 활동 피드 (PostToolUse 훅이 append하는 jsonl) ──────────────────
-ACTIVITY_LOG_PATH = "/home/moos/.hb5u_activity/moojoco_activity.jsonl"
-VORNO_LOG_PATH    = "/home/moos/dev_ws/activity_vorno.jsonl"
-
-
-@app.get("/activity/moojoco")
-def activity_moojoco(limit: int = Query(50, ge=1, le=500)):
-    if not os.path.exists(ACTIVITY_LOG_PATH):
-        return {"entries": []}
-    entries = []
-    with open(ACTIVITY_LOG_PATH, "r") as f:
-        lines = f.readlines()[-limit:]
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            entries.append(json.loads(line))
-        except json.JSONDecodeError:
-            continue
-    return {"entries": entries}
-
-
-@app.get("/activity/vorno")
-def activity_vorno(limit: int = Query(50, ge=1, le=500)):
-    if not os.path.exists(VORNO_LOG_PATH):
-        return {"entries": []}
-    entries = []
-    with open(VORNO_LOG_PATH, "r") as f:
-        lines = f.readlines()[-limit:]
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            entries.append(json.loads(line))
-        except json.JSONDecodeError:
-            continue
-    return {"entries": entries}
-
-
-# ── thesis-4d 사용자 보정 위치 (SQLite) ──────────────────────────────────
-_CORR_DB = Path(__file__).parent.parent / "data" / "viz4d_corrections.db"
-_CORR_DB.parent.mkdir(parents=True, exist_ok=True)
-
-
-def _corr_conn():
-    conn = sqlite3.connect(_CORR_DB)
-    conn.execute("""CREATE TABLE IF NOT EXISTS corrections (
-        slug TEXT PRIMARY KEY,
-        x REAL, y REAL, z REAL,
-        corrected_by TEXT,
-        corrected_at TEXT
-    )""")
-    return conn
-
-
-@app.get("/viz4d/corrections")
-def viz4d_get_corrections():
-    with _corr_conn() as conn:
-        rows = conn.execute(
-            "SELECT slug, x, y, z, corrected_by, corrected_at FROM corrections"
-        ).fetchall()
-    return {
-        slug: {"x": x, "y": y, "z": z, "corrected_by": by, "corrected_at": at}
-        for slug, x, y, z, by, at in rows
-    }
-
-
-@app.post("/viz4d/correction")
-async def viz4d_save_correction(request: Request):
-    body = await request.json()
-    slug = body.get("slug")
-    if not slug:
-        return JSONResponse(status_code=422, content={"error": "slug required"})
-    x, y, z = float(body.get("x", 0)), float(body.get("y", 0)), float(body.get("z", 0))
-    corrected_by = (body.get("corrected_by") or "익명").strip()[:64]
-    corrected_at = datetime.now(timezone.utc).isoformat()
-    with _corr_conn() as conn:
-        conn.execute(
-            "INSERT INTO corrections (slug, x, y, z, corrected_by, corrected_at) VALUES (?,?,?,?,?,?) "
-            "ON CONFLICT(slug) DO UPDATE SET x=excluded.x, y=excluded.y, z=excluded.z, "
-            "corrected_by=excluded.corrected_by, corrected_at=excluded.corrected_at",
-            (slug, x, y, z, corrected_by, corrected_at),
-        )
-    return {"status": "ok", "slug": slug, "corrected_by": corrected_by, "corrected_at": corrected_at}
 
 
 @app.get("/layout")
@@ -472,19 +350,14 @@ def layout(type: str = Query("network")):
         return JSONResponse(cached)
 
     papers = fetch_papers()
-    if type == "4d":
-        from viz4d.layout import compute_4d
-        result = compute_4d(papers, force_layout_3d, parse_tag, _layout_network, _layout_keywords)
-    elif type == "keywords":
-        result = _layout_keywords(papers)
-    else:
-        result = _layout_network(papers)
+    result = _layout_keywords(papers) if type == "keywords" else _layout_network(papers)
     _layout_cache_set(type, result)
     return JSONResponse(result)
 
 
 def _layout_network(papers):
-    nodes = []
+    nodes, edges = [], []
+    seen_edges = set()
     for p in papers:
         nid = p["slug"]
         nodes.append({
@@ -494,20 +367,18 @@ def _layout_network(papers):
             "color": "#a0c4ff",
             "paper_count": 1,
         })
-    # 엣지 가중치 = 공유 태그 수(같은 저자면 최소 1) — 저자 무관하게 태그가
-    # 겹치는 논문끼리 연결해 개념적 근접성(예: 기술↔철학)을 두께로 드러낸다
-    tag_sets = {p["slug"]: {parse_tag(t)["en"] for t in p.get("tags", [])} for p in papers}
-    edge_weight = {}
-    for i in range(len(papers)):
-        for j in range(i + 1, len(papers)):
-            pi, pj = papers[i], papers[j]
-            si, sj = pi["slug"], pj["slug"]
-            shared = len(tag_sets[si] & tag_sets[sj])
-            same_author = pi.get("author") and pi.get("author") == pj.get("author")
-            if not shared and not same_author:
-                continue
-            edge_weight[tuple(sorted([si, sj]))] = max(shared, 1)
-    edges = [{"source": s, "target": t, "weight": w} for (s, t), w in edge_weight.items()]
+    # author가 같은 논문끼리 엣지
+    from collections import defaultdict
+    by_author = defaultdict(list)
+    for p in papers:
+        by_author[p.get("author", "")].append(p["slug"])
+    for author, slugs in by_author.items():
+        for i in range(len(slugs)):
+            for j in range(i + 1, len(slugs)):
+                key = tuple(sorted([slugs[i], slugs[j]]))
+                if key not in seen_edges:
+                    seen_edges.add(key)
+                    edges.append({"source": slugs[i], "target": slugs[j], "weight": 1})
 
     nodes = force_layout_3d(nodes, edges)
     # "links"는 EC2(ers) 소비자 호환용 별칭 — EC2 쪽이 links 키를 기대함
@@ -552,107 +423,6 @@ def _layout_keywords(papers):
 @app.get("/viz/thesis-3d", response_class=HTMLResponse)
 def viz_page():
     return HTMLResponse(content=_HTML)
-
-
-@app.get("/viz/thesis-4d", response_class=HTMLResponse)
-def viz_4d_page():
-    from viz4d.page import HTML_4D
-    return HTMLResponse(content=HTML_4D)
-
-
-_ACTIVITY_HTML = """<!doctype html><html lang="ko"><head><meta charset="utf-8">
-<title>ROOPS 멀티 에이전트 실시간 활동 피드</title>
-<style>
-body{background:#0f1216;color:#e8eaeb;font-family:ui-monospace,"SF Mono",Consolas,monospace;margin:0;padding:2rem;}
-h1{font-size:1.1rem;color:#ff8a3d;margin-bottom:1rem;}
-#log{max-width:980px;}
-.row{display:flex;gap:1rem;padding:.4rem 0;border-bottom:1px solid #2a3038;font-size:.85rem;align-items:center;}
-.ts{color:#616a74;white-space:nowrap;font-size:.80rem;}
-.agent{font-weight:bold;white-space:nowrap;padding:2px 6px;border-radius:4px;font-size:.75rem;}
-.agent-moojoco{background:#4c1d0b;color:#ff8a3d;border:1px solid #7c2d12;}
-.agent-vorno{background:#064e3b;color:#34d399;border:1px solid #047857;}
-.tool{color:#45c7ba;white-space:nowrap;min-width:6em;}
-.summary{color:#e8eaeb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
-#empty{color:#616a74;}
-</style></head><body>
-<h1>⚡ ROOPS 멀티 에이전트 실시간 활동 피드 (UTC 기록 → KST+9h 표기)</h1>
-<div id="log"><span id="empty">로딩 중...</span></div>
-<script>
-function toKSTString(tsStr){
-  if(!tsStr) return '';
-  try {
-    let raw = tsStr.trim();
-    if(!raw.includes('Z') && !raw.includes('+')){
-      raw = raw + 'Z';
-    }
-    const d = new Date(raw);
-    if(isNaN(d.getTime())) return tsStr;
-    const kst = new Date(d.getTime() + (9 * 3600 * 1000));
-    return kst.toISOString().replace('T', ' ').substring(0, 19) + ' (KST)';
-  } catch(e) {
-    return tsStr;
-  }
-}
-
-async function refresh(){
-  try{
-    const [resM, resV] = await Promise.all([
-      fetch('/activity/moojoco?limit=50').then(r => r.json()).catch(() => ({entries:[]})),
-      fetch('/activity/vorno?limit=50').then(r => r.json()).catch(() => ({entries:[]}))
-    ]);
-    const entriesM = (resM.entries || []).map(e => ({...e, agent: e.agent || 'moojoco'}));
-    const entriesV = (resV.entries || []).map(e => ({...e, agent: e.agent || 'vorno'}));
-    const all = [...entriesM, ...entriesV].sort((a,b) => (a.ts || '').localeCompare(b.ts || ''));
-    
-    const el = document.getElementById('log');
-    if(all.length === 0){
-      el.innerHTML = '<span id="empty">아직 활동 기록 없음</span>';
-      return;
-    }
-    el.innerHTML = all.slice().reverse().map(e => {
-      const agentClass = e.agent === 'vorno' ? 'agent-vorno' : 'agent-moojoco';
-      const kstFormatted = toKSTString(e.ts);
-      return `<div class="row"><span class="ts">${kstFormatted}</span><span class="agent ${agentClass}">[${e.agent}]</span><span class="tool">${e.tool||''}</span><span class="summary">${e.summary||''}</span></div>`;
-    }).join('');
-  }catch(e){}
-}
-refresh();
-setInterval(refresh, 10000);
-</script>
-</body></html>"""
-
-
-@app.get("/viz/activity", response_class=HTMLResponse)
-def viz_activity_page():
-    return HTMLResponse(content=_ACTIVITY_HTML)
-
-
-FINGER_DOCKING_SCENE_PATH = "/home/moos/dev_ws/dual_arms/data/finger_docking_3d_scene.json"
-
-
-@app.get("/data/finger-docking-3d-scene.json")
-def finger_docking_scene_data():
-    with open(FINGER_DOCKING_SCENE_PATH) as fp:
-        return JSONResponse(content=json.load(fp))
-
-
-@app.get("/viz/finger-docking-3d", response_class=HTMLResponse)
-def viz_finger_docking_page():
-    return HTMLResponse(content=_FINGER_DOCKING_HTML)
-
-
-@app.get("/data/post-contact-penetration-timeline.png")
-def post_contact_penetration_timeline_png():
-    return FileResponse(
-        "/home/moos/dev_ws/dual_arms/data/post_contact_penetration_timeline.png",
-        media_type="image/png",
-    )
-
-
-@app.get("/data/post-contact-penetration-report.json")
-def post_contact_penetration_report_json():
-    with open("/home/moos/dev_ws/dual_arms/data/post_contact_penetration_report.json") as fp:
-        return JSONResponse(content=json.load(fp))
 
 
 # ── Three.js HTML ─────────────────────────────────────────────────────
@@ -770,7 +540,16 @@ _HTML = """<!DOCTYPE html>
     <input type="range" id="glow-bright-slider" class="ctrl-slider" min="0" max="8" step="1">
   </div>
 </div>
-<div id="legend"></div>
+<div id="legend">
+  <span class="lc" style="background:#ff6b9d"></span>EROS<br>
+  <span class="lc" style="background:#69d2e7"></span>EOS<br>
+  <span class="lc" style="background:#ff8a65"></span><a href="https://hb5u.hyperbook.com/viz/thesis-3d" style="color:inherit;text-decoration:none;" title="thesis-3d 열기">Moojoco</a><br>
+  <span class="lc" style="background:#a8e063"></span>Aegis<br>
+  <span class="lc" style="background:#b39ddb"></span>Hermes<br>
+  <span class="lc" style="background:#ffd54f"></span>Rudex<br>
+  <span class="lc" style="background:#81d4fa"></span>Mojo<br>
+  <span class="lc" style="background:#607d8b"></span>Unknown<br>
+</div>
 <div id="panel">
   <button id="panel-close" onclick="closePanel()">✕</button>
   <div id="panel-body"></div>
@@ -966,14 +745,12 @@ function clearGraph() {
   edgeData = [];
   nodeIdToMesh = {};
   nodeIdToSprite = {};
-  edgeTubes = [];
   autoRotate = true;
   selectedIds.clear();
   groupDragOffsets = null;
 }
 
 // ── Load layout from API ─────────────────────────────────────────────
-window.loadView = loadView;  // HTML onclick에서 호출 가능하도록 (module 스코프 노출)
 async function loadView(type, btn) {
   document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
@@ -996,37 +773,21 @@ async function loadView(type, btn) {
 
 // ── 저자 색상 맵 ─────────────────────────────────────────────────────
 const AUTHOR_COLORS = {
-  'eros':    '#f48fb1',
-  'eос':     '#f48fb1',
-  'eos':     '#26c6da',
+  'eros':    '#ff6b9d',  // 핑크
+  'eос':     '#ff6b9d',
+  'eos':     '#69d2e7',  // 시안
   'moojoco': '#ff8a65',  // 오렌지
-  'aegis':   '#ffd600',
-  'hermes':  '#4ade80',
+  'aegis':   '#a8e063',  // 연두
+  'hermes':  '#b39ddb',  // 보라
   'rudex':   '#ffd54f',  // 노랑
   'mojo':    '#81d4fa',  // 하늘
-  'recon':   '#ce93d8',
-  'haru':    '#fb923c',
+  'recon':   '#f48fb1',  // 연핑크
   'unknown': '#607d8b',  // 회청
 };
 function authorColor(author) {
   if (!author) return AUTHOR_COLORS['unknown'];
   return AUTHOR_COLORS[author.toLowerCase()] || AUTHOR_COLORS['unknown'];
 }
-
-// 범례 = AUTHOR_COLORS 단일 진실 원천(SSoT) — 값을 여기서 바꾸면 범례도 함께 갱신됨
-const LEGEND_SKIP = new Set(['eос']);  // 'eos' 오타 허용용 키(키릴 о) — 범례 중복 방지
-(function renderLegend() {
-  const el = document.getElementById('legend');
-  el.innerHTML = Object.entries(AUTHOR_COLORS)
-    .filter(([key]) => !LEGEND_SKIP.has(key))
-    .map(([key, color]) => {
-      const label = key === 'moojoco'
-        ? '<a href="https://hb5u.hyperbook.com/viz/thesis-3d" style="color:inherit;text-decoration:none;" title="thesis-3d 열기">Moojoco</a>'
-        : key.charAt(0).toUpperCase() + key.slice(1);
-      return `<span class="lc" style="background:${color}"></span>${label}<br>`;
-    })
-    .join('');
-})();
 
 function buildGraph(data) {
   const { nodes, edges, type } = data;
@@ -1058,21 +819,6 @@ function buildGraph(data) {
     edgeLineObj = new THREE.LineSegments(geo, mat);
     graphGroup.add(edgeLineObj);
   }
-
-  // 가중치 ≥2 엣지 — 얇은 기준선 위에 원기둥을 겹쳐 태그 공유 수만큼 두껍게 표시
-  // (LineSegments는 세그먼트별 두께를 지원하지 않아 별도 메시로 표현)
-  edgeTubes = [];
-  const tubeMat = new THREE.MeshBasicMaterial({ color: 0x5b7fb0, transparent: true, opacity: 0.35 });
-  edges.forEach(e => {
-    const w = e.weight || 1;
-    if (w < 2) return;
-    const s = idToNode[e.source], t = idToNode[e.target];
-    if (!s || !t) return;
-    const radius = Math.min(0.4, w * 0.045);
-    const tube = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 1, 6), tubeMat);
-    graphGroup.add(tube);
-    edgeTubes.push({ mesh: tube, source: e.source, target: e.target });
-  });
 
   // 저자별 도형 (논문 네트워크 뷰)
   const AUTHOR_GEO = {
@@ -1126,8 +872,6 @@ function buildGraph(data) {
     graphGroup.add(sprite);
     nodeIdToSprite[n.id] = sprite;  // 노드-스프라이트 연결
   });
-
-  positionEdgeTubes();  // nodeIdToMesh가 채워진 뒤 초기 배치
 }
 
 function makeLabel(text, color) {
@@ -1411,7 +1155,6 @@ let edgeLineObj = null;
 let edgeData = [];
 let validEdgeData = [];
 let nodeIdToMesh = {};
-let edgeTubes = [];  // 가중치 ≥2 엣지의 두께 표현용 원기둥 메시
 
 function updateEdges() {
   if (!edgeLineObj || !edgeData.length) return;
@@ -1425,24 +1168,6 @@ function updateEdges() {
     i += 6;
   });
   pos.needsUpdate = true;
-  positionEdgeTubes();
-}
-
-const _tubeUp = new THREE.Vector3(0, 1, 0);
-const _tubeDir = new THREE.Vector3();
-const _tubeMid = new THREE.Vector3();
-function positionEdgeTubes() {
-  edgeTubes.forEach(({ mesh, source, target }) => {
-    const s = nodeIdToMesh[source], t = nodeIdToMesh[target];
-    if (!s || !t) return;
-    _tubeDir.subVectors(t.position, s.position);
-    const len = _tubeDir.length();
-    if (len < 1e-6) return;
-    _tubeMid.addVectors(s.position, t.position).multiplyScalar(0.5);
-    mesh.position.copy(_tubeMid);
-    mesh.scale.set(1, len, 1);
-    mesh.quaternion.setFromUnitVectors(_tubeUp, _tubeDir.clone().normalize());
-  });
 }
 
 // ── Animation loop ───────────────────────────────────────────────────
@@ -1660,224 +1385,6 @@ document.querySelectorAll('.search-clr').forEach(btn => {
 
 // 초기 로드
 loadView('keywords', null);
-</script>
-</body>
-</html>
-"""
-
-_FINGER_DOCKING_HTML = """<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<title>5손가락 도킹 실측 3D — Moojoco</title>
-<style>
-html,body{margin:0;height:100%;background:#0f1216;color:#e8eaeb;font-family:ui-monospace,"SF Mono",Consolas,monospace;overflow:hidden;}
-#panel{position:fixed;top:0;left:0;z-index:10;padding:1rem 1.2rem;max-width:420px;background:linear-gradient(180deg,rgba(15,18,22,.92),rgba(15,18,22,.55) 80%,transparent);}
-#panel h1{font-size:1.0rem;color:#ff8a3d;margin:0 0 .5rem;}
-#panel p{font-size:.78rem;line-height:1.5;color:#c3c9d1;margin:.3rem 0;}
-#panel a{color:#45c7ba;}
-#stats{font-size:.82rem;margin-top:.6rem;padding:.6rem .7rem;border:1px solid #2a3038;border-radius:6px;background:rgba(20,24,30,.7);}
-#stats div{display:flex;justify-content:space-between;gap:1rem;padding:1px 0;}
-#stats .k{color:#818a94;}
-#stats .v{color:#e8eaeb;font-weight:bold;}
-#stats .warn{color:#ff5d5d;}
-#controls{position:fixed;bottom:0;left:0;right:0;z-index:10;padding:.8rem 1.2rem 1rem;background:linear-gradient(0deg,rgba(15,18,22,.92),transparent);display:flex;align-items:center;gap:.8rem;}
-#controls button{background:#1c2128;color:#e8eaeb;border:1px solid #2a3038;border-radius:6px;padding:.4rem .9rem;cursor:pointer;font-family:inherit;font-size:.8rem;}
-#controls button:hover{background:#262c35;}
-#scrub{flex:1;}
-#tlabel{font-size:.78rem;color:#818a94;min-width:9em;text-align:right;}
-canvas{display:block;}
-#legend{position:fixed;top:1rem;right:1rem;z-index:10;font-size:.75rem;color:#c3c9d1;background:rgba(20,24,30,.7);border:1px solid #2a3038;border-radius:6px;padding:.5rem .7rem;}
-#legend div{display:flex;align-items:center;gap:.4rem;padding:2px 0;}
-.dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
-</style>
-</head>
-<body>
-<div id="panel">
-  <h1>5손가락 물리 도킹 — 접촉 유지 실측 3D 재생 (mj_step 실물리)</h1>
-  <p>verify_post_contact_penetration.py와 동일한 MuJoCo 시뮬레이션(접근+접촉유지 전 구간 mj_step 500Hz
-  실물리, 손목 접근과 손가락 말아쥐기 동기 진행)의 실제 geom xpos/xmat 궤적을 그대로 재생합니다.
-  접근(0~4s) 이후 손목 목표를 그대로 3초간 유지(hold)하여 접촉 성립 이후 침투가 발산하는지 확인합니다.
-  빨간색으로 표시된 손가락은 해당 프레임에서 <b>data.contact[i].dist &lt; 0</b>(실제 지오메트리 침투)이
-  발생한 geom입니다.</p>
-  <p>검증 근거: <a href="https://thesis.hyperbook.com/papers/2026-08-05-moojoco-zero-penetration-guideline-empirical-verification" target="_blank">thesis 실측 검증 보고서</a></p>
-  <div id="stats">
-    <div><span class="k">t</span><span class="v" id="s-t">-</span></div>
-    <div><span class="k">phase</span><span class="v" id="s-phase">-</span></div>
-    <div><span class="k">접촉쌍 수</span><span class="v" id="s-ncon">-</span></div>
-    <div><span class="k">최악 침투(이 프레임)</span><span class="v warn" id="s-worst">-</span></div>
-    <div><span class="k">캡슐 반경 대비</span><span class="v warn" id="s-ratio">-</span></div>
-  </div>
-</div>
-<div id="legend">
-  <div><span class="dot" style="background:#3bc4f2"></span> Hand A</div>
-  <div><span class="dot" style="background:#f2953b"></span> Hand B</div>
-  <div><span class="dot" style="background:#ff2d2d"></span> 침투 중(dist&lt;0)</div>
-</div>
-<div id="controls">
-  <button id="play">일시정지</button>
-  <input id="scrub" type="range" min="0" max="79" value="0" step="1">
-  <span id="tlabel">frame 0 / 0</span>
-</div>
-<script type="importmap">
-  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
-                 "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/" } }
-</script>
-<script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0f1216);
-scene.fog = new THREE.Fog(0x0f1216, 0.3, 1.2);
-
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.001, 10);
-camera.up.set(0, 0, 1);
-camera.position.set(0.22, -0.22, 0.16);
-camera.lookAt(0, 0, 0.03);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
-
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 0, 0.03);
-controls.enableDamping = true;
-controls.update();
-
-scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-const key = new THREE.DirectionalLight(0xffffff, 1.1);
-key.position.set(0.3, -0.4, 0.5);
-scene.add(key);
-const rim = new THREE.DirectionalLight(0x88aaff, 0.4);
-rim.position.set(-0.3, 0.3, -0.2);
-scene.add(rim);
-
-const grid = new THREE.GridHelper(0.4, 20, 0x2a3038, 0x1c2128);
-grid.rotation.x = Math.PI / 2;
-grid.position.z = -0.15;
-scene.add(grid);
-
-function quatFromMat3(m) {
-  const mat4 = new THREE.Matrix4();
-  mat4.set(
-    m[0], m[1], m[2], 0,
-    m[3], m[4], m[5], 0,
-    m[6], m[7], m[8], 0,
-    0, 0, 0, 1
-  );
-  const q = new THREE.Quaternion();
-  q.setFromRotationMatrix(mat4);
-  return q;
-}
-
-const Y_AXIS = new THREE.Vector3(0, 1, 0);
-function quatAlignYTo(dir) {
-  return new THREE.Quaternion().setFromUnitVectors(Y_AXIS, dir.clone().normalize());
-}
-
-let scene_data = null;
-let meshes = {};   // name -> {mesh, type, size, baseColor}
-let frameIdx = 0;
-let playing = true;
-
-async function load() {
-  const res = await fetch('/data/finger-docking-3d-scene.json');
-  scene_data = await res.json();
-
-  const R = scene_data.capsule_radius_m;
-  for (const g of scene_data.geoms_static) {
-    let mesh;
-    const color = new THREE.Color(g.rgba[0], g.rgba[1], g.rgba[2]);
-    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.05 });
-    if (g.type === 'box') {
-      const geo = new THREE.BoxGeometry(g.size[0] * 2, g.size[1] * 2, g.size[2] * 2);
-      mesh = new THREE.Mesh(geo, mat);
-    } else {
-      const halfLen = g.size[1];
-      const geo = new THREE.CapsuleGeometry(R, halfLen * 2, 6, 12);
-      mesh = new THREE.Mesh(geo, mat);
-    }
-    mesh.userData.type = g.type;
-    mesh.userData.baseColor = color;
-    scene.add(mesh);
-    meshes[g.name] = mesh;
-  }
-
-  const scrub = document.getElementById('scrub');
-  scrub.max = scene_data.frames.length - 1;
-  applyFrame(0);
-  requestAnimationFrame(tick);
-}
-
-function applyFrame(idx) {
-  const frame = scene_data.frames[idx];
-  const penetrating = new Set();
-  let worst = 0.0;
-  for (const c of frame.contacts) {
-    penetrating.add(c.g1);
-    penetrating.add(c.g2);
-    if (c.d < worst) worst = c.d;
-  }
-  for (const gdata of frame.geoms) {
-    const mesh = meshes[gdata.n];
-    if (!mesh) continue;
-    mesh.position.set(gdata.p[0], gdata.p[1], gdata.p[2]);
-    if (mesh.userData.type === 'box') {
-      mesh.quaternion.copy(quatFromMat3(gdata.m));
-    } else {
-      const dir = new THREE.Vector3(gdata.m[2], gdata.m[5], gdata.m[8]);
-      mesh.quaternion.copy(quatAlignYTo(dir));
-    }
-    const isPen = penetrating.has(gdata.n);
-    mesh.material.color.copy(isPen ? new THREE.Color(0xff2d2d) : mesh.userData.baseColor);
-    mesh.material.emissive = new THREE.Color(isPen ? 0x550000 : 0x000000);
-  }
-  document.getElementById('s-t').textContent = frame.t.toFixed(3) + ' s';
-  document.getElementById('s-phase').textContent = frame.phase;
-  document.getElementById('s-ncon').textContent = frame.contacts.length;
-  document.getElementById('s-worst').textContent = (worst * 1000).toFixed(2) + ' mm';
-  document.getElementById('s-ratio').textContent = (Math.abs(worst) / scene_data.capsule_radius_m).toFixed(2) + 'x';
-  document.getElementById('scrub').value = idx;
-  document.getElementById('tlabel').textContent = `frame ${idx} / ${scene_data.frames.length - 1}`;
-}
-
-let lastTick = performance.now();
-function tick(now) {
-  requestAnimationFrame(tick);
-  controls.update();
-  if (playing && scene_data) {
-    const dt = now - lastTick;
-    if (dt > 1000 / scene_data.fps) {
-      lastTick = now;
-      frameIdx = (frameIdx + 1) % scene_data.frames.length;
-      applyFrame(frameIdx);
-    }
-  }
-  renderer.render(scene, camera);
-}
-
-document.getElementById('play').addEventListener('click', (e) => {
-  playing = !playing;
-  e.target.textContent = playing ? '일시정지' : '재생';
-});
-document.getElementById('scrub').addEventListener('input', (e) => {
-  playing = false;
-  document.getElementById('play').textContent = '재생';
-  frameIdx = parseInt(e.target.value, 10);
-  applyFrame(frameIdx);
-});
-
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-load();
 </script>
 </body>
 </html>

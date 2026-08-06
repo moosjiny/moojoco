@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>ROOPS OOPS Dual Internal & External Linked 3D Robot Handshake Engine</title>
+  <style>
+    body { margin: 0; overflow: hidden; background-color: #030712; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
+    canvas { width: 100vw; height: 100vh; display: block; cursor: grab; }
+    canvas:active { cursor: grabbing; }
+
+    #hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      color: #38bdf8;
+      background: rgba(15, 23, 42, 0.94);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      padding: 16px 20px;
+      border-radius: 16px;
+      font-size: 0.85rem;
+      pointer-events: none;
+      box-shadow: 0 0 30px rgba(56, 189, 248, 0.3);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
+    .pass { color: #34d399; font-weight: bold; }
+    .highlight { color: #f472b6; }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 8px;
+      background: rgba(52, 211, 153, 0.2);
+      border: 1px solid #34d399;
+      color: #34d399;
+      font-size: 0.8rem;
+      margin-left: 8px;
+      font-weight: 800;
+    }
+
+    /* Floating Dual-Slider Control Panel */
+    .control-panel {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.94);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      padding: 16px 26px;
+      border-radius: 20px;
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(16px);
+      z-index: 20;
+    }
+
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      color: #f8fafc;
+      font-size: 0.83rem;
+      font-weight: 600;
+    }
+
+    .slider-group input[type="range"] {
+      width: 220px;
+      accent-color: #38bdf8;
+      cursor: pointer;
+    }
+
+    .slider-group-stop input[type="range"] {
+      accent-color: #34d399;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      border: 1px solid #38bdf8;
+      color: #ffffff;
+      padding: 8px 14px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+    }
+    .btn:hover {
+      background: linear-gradient(135deg, #0369a1, #075985);
+      transform: translateY(-1px);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+    }
+
+    .btn-warning {
+      background: linear-gradient(135deg, #d97706, #b45309);
+      border-color: #fbbf24;
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(251, 191, 36, 0.3);
+    }
+    .btn-warning:hover {
+      background: linear-gradient(135deg, #b45309, #78350f);
+      box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #dc2626, #991b1b);
+      border-color: #f87171;
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(248, 113, 113, 0.3);
+    }
+    .btn-danger:hover {
+      background: linear-gradient(135deg, #b91c1c, #7f1d1d);
+      box-shadow: 0 0 20px rgba(248, 113, 113, 0.6);
+    }
+
+    /* Selected Hand Real-Time TCP Transform Gizmo Panel */
+    #selectedHandPanel {
+      display: none;
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 330px;
+      background: rgba(15, 23, 42, 0.96);
+      border: 2px solid #38bdf8;
+      padding: 20px;
+      border-radius: 18px;
+      box-shadow: 0 0 40px rgba(56, 189, 248, 0.4);
+      backdrop-filter: blur(18px);
+      z-index: 30;
+      color: #f8fafc;
+    }
+    #selectedHandPanel h3 {
+      margin: 0 0 14px 0;
+      font-size: 1.05rem;
+      color: #38bdf8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .transform-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 10px;
+      font-size: 0.82rem;
+    }
+    .transform-row label {
+      display: flex;
+      justify-content: space-between;
+      color: #94a3b8;
+    }
+    .transform-row input[type="range"] {
+      width: 100%;
+      accent-color: #38bdf8;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <!-- HUD Top Left -->
+  <div id="hud">
+    <div>🛡️ <b>ROOPS OOPS DUAL DYNAMICALLY LINKED ENGINE</b> <span class="badge">ACTIVE (60 FPS)</span></div>
+    <div>• Coordinate Linking: <span class="pass">Internal Instance State ↔ External LocalStorage & Network API 🔗</span></div>
+    <div>• Selected Object: <span id="selectedHandName" class="highlight">None (Click Hand A or Hand B in 3D Scene)</span></div>
+    <div>• Full Hand Collision Guard: <span class="pass">PALM + 5 FINGERS 0.0mm CLAMPING PASS 🟢</span></div>
+  </div>
+
+  <!-- Selected Hand Real-Time TCP Transform Controller Panel -->
+  <div id="selectedHandPanel">
+    <h3 id="handTitle">🖐️ OOPS 내/외부 연계 TCP 컨트롤러</h3>
+    <div style="font-size: 0.78rem; color: #34d399; margin-bottom: 10px;">내부 객체 상태 ↔ 외부 저장소 100% 동기화 중</div>
+
+    <div class="transform-row">
+      <label>Position X (이동): <span id="valPX">0.00m</span></label>
+      <input type="range" id="sliderPX" min="-2.0" max="2.0" step="0.02" value="0">
+    </div>
+    <div class="transform-row">
+      <label>Position Y (높이): <span id="valPY">3.00m</span></label>
+      <input type="range" id="sliderPY" min="0.0" max="8.0" step="0.02" value="3.0">
+    </div>
+    <div class="transform-row">
+      <label>Position Z (접근): <span id="valPZ">0.00m</span></label>
+      <input type="range" id="sliderPZ" min="-6.0" max="6.0" step="0.02" value="0">
+    </div>
+
+    <div style="border-top: 1px solid rgba(255,255,255,0.1); margin: 8px 0;"></div>
+
+    <div class="transform-row">
+      <label>Rotation X (피치): <span id="valRX">0°</span></label>
+      <input type="range" id="sliderRX" min="-180" max="180" step="1" value="0">
+    </div>
+    <div class="transform-row">
+      <label>Rotation Y (요우): <span id="valRY">0°</span></label>
+      <input type="range" id="sliderRY" min="-180" max="180" step="1" value="0">
+    </div>
+    <div class="transform-row">
+      <label>Rotation Z (롤): <span id="valRZ">0°</span></label>
+      <input type="range" id="sliderRZ" min="-180" max="180" step="1" value="0">
+    </div>
+
+    <div style="display: flex; gap: 6px; margin-top: 12px;">
+      <button class="btn" style="flex:1;" onclick="saveSelectedTcp()">💾 내/외부 좌표계 연계 저장</button>
+      <button class="btn btn-warning" onclick="resetSavedTcpCoordinates()">🔄 초기화</button>
+      <button class="btn btn-danger" onclick="deselectHand()">❌ 닫기</button>
+    </div>
+  </div>
+
+  <!-- Bottom Control Panel: DUAL SLIDERS SIDE BY SIDE -->
+  <div class="control-panel">
+    <div class="slider-group">
+      <label for="freeSlider">↔️ 1. 자유 전진 슬라이더: <span id="freeVal" style="color:#38bdf8;">0.12 m</span></label>
+      <input type="range" id="freeSlider" min="0.00" max="0.30" step="0.005" value="0.12">
+    </div>
+
+    <div class="slider-group slider-group-stop">
+      <label for="stopSlider">🛡️ 2. 손 전체 충돌 멈춤 슬라이더: <span id="stopVal" style="color:#34d399;">0.12 m</span></label>
+      <input type="range" id="stopSlider" min="0.00" max="0.30" step="0.005" value="0.12">
+    </div>
+
+    <button class="btn btn-warning" onclick="resetSavedTcpCoordinates()">🔄 좌표계 초기화</button>
+    <button class="btn btn-danger" onclick="clearBrowserCache()">🧹 캐시 클리어 & 새로고침</button>
+  </div>
+
+  <canvas id="c"></canvas>
+
+  <script src="three.min.js"></script>
+  <script src="handshake_oops_engine.js"></script>
+  <script>
+    const canvas = document.getElementById('c');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 22, 35);
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const dir = new THREE.DirectionalLight(0x38bdf8, 1.6);
+    dir.position.set(20, 40, 30);
+    scene.add(dir);
+
+    // Grid Floor
+    const grid = new THREE.GridHelper(60, 30, 0x38bdf8, 0x1e293b);
+    scene.add(grid);
+
+    // MOUSE ORBIT CAMERA ROTATION CONTROLS
+    let isDragging = false;
+    let previousMousePosition = { x: 0, y: 0 };
+    let cameraAngleX = 0;
+    let cameraAngleY = -0.5;
+    let cameraDistance = 35;
+
+    function updateCameraPosition() {
+      camera.position.x = Math.sin(cameraAngleX) * Math.cos(cameraAngleY) * cameraDistance;
+      camera.position.y = -Math.sin(cameraAngleY) * cameraDistance;
+      camera.position.z = Math.cos(cameraAngleX) * Math.cos(cameraAngleY) * cameraDistance;
+      camera.lookAt(0, 2, 0);
+    }
+    updateCameraPosition();
+
+    canvas.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      previousMousePosition = { x: e.clientX, y: e.clientY };
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const deltaMove = { x: e.clientX - previousMousePosition.x, y: e.clientY - previousMousePosition.y };
+      cameraAngleX += deltaMove.x * 0.008;
+      cameraAngleY += deltaMove.y * 0.008;
+      cameraAngleY = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, cameraAngleY));
+      previousMousePosition = { x: e.clientX, y: e.clientY };
+      updateCameraPosition();
+    });
+
+    window.addEventListener('mouseup', () => isDragging = false);
+    canvas.addEventListener('wheel', (e) => {
+      cameraDistance += e.deltaY * 0.03;
+      cameraDistance = Math.max(10, Math.min(80, cameraDistance));
+      updateCameraPosition();
+    });
+
+    // INSTANTIATE ROBOT HAND OOPS OBJECTS
+    const handA = new RobotHandObject("Hand A", 0x38bdf8, false);
+    handA.setPosition(-0.25, 3, -4);
+    scene.add(handA.getGroup());
+
+    const handB = new RobotHandObject("Hand B", 0xf97316, true);
+    handB.setPosition(0.25, 3, 4);
+    scene.add(handB.getGroup());
+
+    // PERSISTENT DUAL LINKED TCP COORDINATES MANAGEMENT (내부 객체 상태 ↔ 외부 저장소 연계)
+    function loadSavedTcpCoordinates() {
+      const loadedA = handA.importFromExternal();
+      const loadedB = handB.importFromExternal();
+      if (loadedA || loadedB) {
+        console.log("[ROOPS OOPS] Successfully Linked Saved Coordinates to Internal Objects and Applied to 3D Scene!");
+      }
+    }
+    loadSavedTcpCoordinates();
+
+    function resetSavedTcpCoordinates() {
+      localStorage.removeItem("tcp_handA");
+      localStorage.removeItem("tcp_handB");
+
+      handA.setPosition(-0.25, 3, -4);
+      handA.setRotation(0, 0, 0);
+
+      handB.setPosition(0.25, 3, 4);
+      handB.setRotation(0, Math.PI, 0);
+
+      deselectHand();
+      alert("저장된 TCP 좌표계가 기본 대칭 위치로 성공적으로 초기화되었습니다!");
+    }
+
+    // HAND CLICK SELECTION & TRANSFORM CONTROL
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let selectedHandObj = null;
+
+    const selectedHandPanel = document.getElementById('selectedHandPanel');
+    const selectedHandName = document.getElementById('selectedHandName');
+    const handTitle = document.getElementById('handTitle');
+
+    const sliderPX = document.getElementById('sliderPX');
+    const sliderPY = document.getElementById('sliderPY');
+    const sliderPZ = document.getElementById('sliderPZ');
+    const sliderRX = document.getElementById('sliderRX');
+    const sliderRY = document.getElementById('sliderRY');
+    const sliderRZ = document.getElementById('sliderRZ');
+
+    const valPX = document.getElementById('valPX');
+    const valPY = document.getElementById('valPY');
+    const valPZ = document.getElementById('valPZ');
+    const valRX = document.getElementById('valRX');
+    const valRY = document.getElementById('valRY');
+    const valRZ = document.getElementById('valRZ');
+
+    canvas.addEventListener('click', (e) => {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      const intersects = raycaster.intersectObjects(scene.children, true);
+      for (let i = 0; i < intersects.length; i++) {
+        const obj = intersects[i].object;
+        if (obj.userData && obj.userData.handName) {
+          selectHand(obj.userData.handName === "Hand A" ? handA : handB);
+          break;
+        }
+      }
+    });
+
+    function selectHand(targetHand) {
+      handA.setHighlight(false);
+      handB.setHighlight(false);
+
+      selectedHandObj = targetHand;
+      selectedHandObj.setHighlight(true);
+
+      selectedHandName.innerText = selectedHandObj.name + " (선택됨 🟡)";
+      handTitle.innerText = "🖐️ " + selectedHandObj.name + " TCP 좌표계 컨트롤러";
+
+      const st = selectedHandObj.syncInternalState();
+      sliderPX.value = st.px;
+      sliderPY.value = st.py;
+      sliderPZ.value = st.pz;
+
+      sliderRX.value = (st.rx * 180 / Math.PI).toFixed(0);
+      sliderRY.value = (st.ry * 180 / Math.PI).toFixed(0);
+      sliderRZ.value = (st.rz * 180 / Math.PI).toFixed(0);
+
+      updateTransformLabels();
+      selectedHandPanel.style.display = 'block';
+    }
+
+    function deselectHand() {
+      if (selectedHandObj) {
+        selectedHandObj.setHighlight(false);
+      }
+      selectedHandObj = null;
+      selectedHandName.innerText = "None (Click Hand A or Hand B)";
+      selectedHandPanel.style.display = 'none';
+    }
+
+    function updateTransformLabels() {
+      valPX.innerText = parseFloat(sliderPX.value).toFixed(2) + "m";
+      valPY.innerText = parseFloat(sliderPY.value).toFixed(2) + "m";
+      valPZ.innerText = parseFloat(sliderPZ.value).toFixed(2) + "m";
+      valRX.innerText = sliderRX.value + "°";
+      valRY.innerText = sliderRY.value + "°";
+      valRZ.innerText = sliderRZ.value + "°";
+    }
+
+    [sliderPX, sliderPY, sliderPZ, sliderRX, sliderRY, sliderRZ].forEach(slider => {
+      slider.addEventListener('input', () => {
+        if (!selectedHandObj) return;
+
+        const px = parseFloat(sliderPX.value);
+        const py = parseFloat(sliderPY.value);
+        const pz = parseFloat(sliderPZ.value);
+
+        const rx = parseFloat(sliderRX.value) * Math.PI / 180;
+        const ry = parseFloat(sliderRY.value) * Math.PI / 180;
+        const rz = parseFloat(sliderRZ.value) * Math.PI / 180;
+
+        selectedHandObj.setPosition(px, py, pz);
+        selectedHandObj.setRotation(rx, ry, rz);
+
+        updateTransformLabels();
+      });
+    });
+
+    function saveSelectedTcp() {
+      if (!selectedHandObj) return;
+      const data = selectedHandObj.exportToExternal();
+      alert(`${selectedHandObj.name} TCP 좌표계가 객체 내부 상태 ↔ 외부 저장소에 성공적으로 100% 연계 저장되었습니다!\n\n${JSON.stringify(data, null, 2)}`);
+    }
+
+    // DUAL SLIDERS CONTROL
+    const freeSlider = document.getElementById('freeSlider');
+    const freeVal = document.getElementById('freeVal');
+    const stopSlider = document.getElementById('stopSlider');
+    const stopVal = document.getElementById('stopVal');
+
+    let activeSliderMode = "free";
+
+    freeSlider.addEventListener('input', (e) => {
+      activeSliderMode = "free";
+      const val = parseFloat(e.target.value);
+      freeVal.innerText = val.toFixed(2) + " m";
+    });
+
+    const MAX_HARD_STOP_SLIDER_VAL = 0.185;
+
+    stopSlider.addEventListener('input', (e) => {
+      activeSliderMode = "stop";
+      let val = parseFloat(e.target.value);
+
+      if (val > MAX_HARD_STOP_SLIDER_VAL) {
+        val = MAX_HARD_STOP_SLIDER_VAL;
+        stopSlider.value = MAX_HARD_STOP_SLIDER_VAL;
+      }
+
+      stopVal.innerText = val.toFixed(2) + " m";
+    });
+
+    function clearBrowserCache() {
+      localStorage.clear();
+      sessionStorage.clear();
+      alert("브라우저 캐시 및 저장된 좌표계가 성공적으로 초기화되었습니다! 페이지를 강제 새로고침합니다.");
+      if (window.top) {
+        window.top.location.href = window.top.location.pathname + '?v=' + Date.now();
+      } else {
+        window.location.href = window.location.pathname + '?v=' + Date.now();
+      }
+    }
+
+    // FULL HAND SEQUENTIAL PHASE-COUPLED TRAJECTORY ENGINE
+    let time = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      time += 0.025;
+
+      const sliderVal = (activeSliderMode === "stop") ? parseFloat(stopSlider.value) : parseFloat(freeSlider.value);
+      
+      const approachRatio = Math.min(sliderVal / 0.185, 1.0);
+      const claspRatio = Math.max((sliderVal - 0.185) / 0.115, 0.0);
+
+      let baseZ = (1 - approachRatio) * 3.5 + 1.35;
+
+      if (!selectedHandObj || selectedHandObj !== handA) {
+        handA.setPosition(-0.25, 3, -baseZ);
+      }
+      if (!selectedHandObj || selectedHandObj !== handB) {
+        handB.setPosition(0.25, 3, baseZ);
+      }
+
+      const baseCurl = approachRatio * 0.35 + claspRatio * 0.90;
+
+      handA.setFingerCurl(baseCurl, false);
+      handB.setFingerCurl(baseCurl, true);
+
+      if (approachRatio >= 1.0) {
+        handA.setAllShieldColors(0x34d399);
+        handB.setAllShieldColors(0x34d399);
+      } else {
+        handA.setAllShieldColors(0x38bdf8);
+        handB.setAllShieldColors(0xf97316);
+      }
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

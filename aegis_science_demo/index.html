@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Aegis ↔ Moojoco Real-Time Executable 3D WebGL Handshake Command Center</title>
+  <!-- Modern Crisp Korean Typography: Noto Sans KR + Outfit + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Noto+Sans+KR:wght@300;400;600;700;800;900&family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #030712;
+      --panel-bg: rgba(15, 23, 42, 0.88);
+      --panel-border: rgba(56, 189, 248, 0.35);
+      --accent-cyan: #38bdf8;
+      --accent-green: #34d399;
+      --accent-purple: #c084fc;
+      --accent-pink: #f472b6;
+      --accent-red: #f87171;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans KR', 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    header {
+      background: var(--panel-bg);
+      backdrop-filter: blur(18px);
+      border-bottom: 1px solid var(--panel-border);
+      padding: 14px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900; color: #000; font-size: 1.3rem;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff, var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      background: rgba(2, 6, 23, 0.7);
+      padding: 4px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+    }
+
+    .tab-btn:hover, .tab-btn.active {
+      background: rgba(56, 189, 248, 0.22);
+      color: var(--accent-cyan);
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+    }
+
+    main {
+      flex: 1;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      max-width: 1440px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .tab-content {
+      width: 100%;
+      display: none;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .tab-content.active {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .media-card {
+      width: 100%;
+      background: var(--panel-bg);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--panel-border);
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 16px 50px rgba(0, 0, 0, 0.6);
+      position: relative;
+    }
+
+    .media-card img {
+      width: 100%;
+      height: auto;
+      display: block;
+      object-fit: cover;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+      width: 100%;
+    }
+
+    .info-box {
+      background: var(--panel-bg);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 16px 20px;
+      backdrop-filter: blur(12px);
+    }
+
+    .info-box h4 {
+      font-size: 0.78rem;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    .info-box .val {
+      font-size: 1.2rem;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', 'Noto Sans KR', monospace;
+      color: var(--accent-green);
+    }
+
+    iframe.canvas-iframe {
+      width: 100%;
+      height: 680px;
+      border: none;
+      border-radius: 20px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-logo">⚡</div>
+      <div>
+        <div class="brand-title">Real-Time Executable 3D WebGL Robot Handshake Engine</div>
+        <div style="font-size: 0.78rem; color: var(--text-muted);">Real-Time Code Execution — 180° Symmetric Facing Right-Hand Touch Clasp (Three.js 60 FPS)</div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <button onclick="clearHeaderCache()" style="background: linear-gradient(135deg, #dc2626, #991b1b); border: 1px solid #f87171; color: #fff; padding: 6px 14px; border-radius: 10px; font-weight: 700; font-size: 0.8rem; cursor: pointer; box-shadow: 0 0 12px rgba(248, 113, 113, 0.3);">🧹 캐시 클리어 & 새로고침</button>
+
+      <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('live-3d-engine')">⚡ 실시간 3D 코드 구동엔진</button>
+        <button class="tab-btn" onclick="switchTab('tcp-axes-gif')">🔴🟢 툴좌표계 전후 비교 GIF</button>
+        <button class="tab-btn" onclick="switchTab('true-3d-mesh')">🛡️ MuJoCo 3D 물리 메쉬</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- TAB 1: 100% LIVE INTERACTIVE EXECUTABLE 3D WEBGL ENGINE -->
+    <div id="tab-live-3d-engine" class="tab-content active">
+      <div class="media-card">
+        <iframe src="live_canvas.html" class="canvas-iframe"></iframe>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-box">
+          <h4>3D 구동엔진 소스코드</h4>
+          <div class="val" style="color:var(--accent-cyan);">Three.js Live Code Execution</div>
+        </div>
+        <div class="info-box">
+          <h4>키네마틱스 정의</h4>
+          <div class="val" style="color:var(--accent-pink);">180° 마주보기 오른손-오른손 대칭</div>
+        </div>
+        <div class="info-box">
+          <h4>손가락 실질 맞닿음</h4>
+          <div class="val" style="color:var(--accent-green);">10손가락 인터로킹 파지 감싸기</div>
+        </div>
+        <div class="info-box">
+          <h4>TCP 툴좌표계 시각화</h4>
+          <div class="val" style="color:var(--accent-purple);">Red=X, Green=Y, Blue=Z 3축</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: TCP Axes Before vs After Labeled GIF -->
+    <div id="tab-tcp-axes-gif" class="tab-content">
+      <div class="media-card">
+        <img src="https://images.hyperbook.com/handshake_tcp_kinematic_before_after.gif?v=20260806_tcp_v7" alt="툴좌표계 TCP Axes 수정 전후 라벨링 GIF">
+      </div>
+    </div>
+
+    <!-- TAB 3: MuJoCo True 3D Physics Mesh Render -->
+    <div id="tab-true-3d-mesh" class="tab-content">
+      <div class="media-card">
+        <img src="https://images.hyperbook.com/true_3d_mesh_handshake_coordinate_render.png?v=20260806_true3d_v7" alt="MuJoCo True 3D Physics Mesh Render">
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function clearHeaderCache() {
+      localStorage.clear();
+      sessionStorage.clear();
+      alert("브라우저 캐시가 성공적으로 클리어되었습니다! 강제 새로고침합니다.");
+      window.location.href = window.location.pathname + '?v=' + Date.now();
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.add('active');
+    }
+  </script>
+</body>
+</html>
