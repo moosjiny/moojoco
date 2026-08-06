@@ -1,0 +1,33 @@
+{
+  "handName": "Hand B",
+  "px": 0.25, "py": 3, "pz": 1.35,
+  "rx": 0, "ry": 3.14159, "rz": 0,
+  "lastUpdated": 1785978528176,
+  "fingers": [
+    { "name": "thumb", "isThumb": true, "segments": [
+      { "name": "thumb_metacarpal", "jointAngleDeg": 23.1848, "tip": [2.02753, 2.64567, -0.458043] },
+      { "name": "thumb_proximal", "jointAngleDeg": 47.2283, "tip": [2.09947, 1.70354, -0.785471] },
+      { "name": "thumb_distal", "jointAngleDeg": 68.6957, "tip": [1.98592, 1.2453, -0.268631] }
+    ] },
+    { "name": "index", "isThumb": false, "segments": [
+      { "name": "index_proximal", "jointAngleDeg": 85.8696, "tip": [1.06403, 1.60364, -0.149857] },
+      { "name": "index_middle", "jointAngleDeg": 94.4565, "tip": [0.951027, 1.60826, 0.654228] },
+      { "name": "index_distal", "jointAngleDeg": 62.3413, "tip": [0.913453, 2.13061, 0.921584] }
+    ] },
+    { "name": "middle", "isThumb": false, "segments": [
+      { "name": "middle_proximal", "jointAngleDeg": 85.8696, "tip": [0.25, 1.5039, -0.258041] },
+      { "name": "middle_middle", "jointAngleDeg": 94.4565, "tip": [0.25, 1.50885, 0.611945] },
+      { "name": "middle_distal", "jointAngleDeg": 62.3413, "tip": [0.25, 2.06851, 0.901213] }
+    ] },
+    { "name": "ring", "isThumb": false, "segments": [
+      { "name": "ring_proximal", "jointAngleDeg": 81.5761, "tip": [-0.577524, 1.66456, -0.245845] },
+      { "name": "ring_middle", "jointAngleDeg": 90.163, "tip": [-0.469682, 1.55206, 0.52149] },
+      { "name": "ring_distal", "jointAngleDeg": 59.5076, "tip": [-0.420286, 1.99424, 0.87296] }
+    ] },
+    { "name": "pinky", "isThumb": false, "segments": [
+      { "name": "pinky_proximal", "jointAngleDeg": 77.2826, "tip": [-1.40858, 1.92699, -0.0849634] },
+      { "name": "pinky_middle", "jointAngleDeg": 85.8696, "tip": [-1.26086, 1.74207, 0.507514] },
+      { "name": "pinky_distal", "jointAngleDeg": 56.6739, "tip": [-1.17502, 2.03797, 0.851787] }
+    ] }
+  ]
+}
