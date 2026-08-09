@@ -1,0 +1,485 @@
+{
+  "communities": {
+    "0": [
+      "scripts_viz_server",
+      "scripts_viz_server_corr_conn",
+      "scripts_viz_server_fetch_papers",
+      "scripts_viz_server_force_layout_3d",
+      "scripts_viz_server_force_layout_binary",
+      "scripts_viz_server_force_layout_cpu",
+      "scripts_viz_server_force_layout_gpu",
+      "scripts_viz_server_get_redis",
+      "scripts_viz_server_get_resource",
+      "scripts_viz_server_health",
+      "scripts_viz_server_heartbeat_loop",
+      "scripts_viz_server_layout",
+      "scripts_viz_server_layout_cache_get",
+      "scripts_viz_server_layout_cache_invalidate",
+      "scripts_viz_server_layout_cache_set",
+      "scripts_viz_server_layout_invalidate",
+      "scripts_viz_server_layout_keywords",
+      "scripts_viz_server_layout_network",
+      "scripts_viz_server_parse_tag",
+      "scripts_viz_server_py_request",
+      "scripts_viz_server_rationale_1",
+      "scripts_viz_server_rationale_236",
+      "scripts_viz_server_rationale_262",
+      "scripts_viz_server_refresh_resource",
+      "scripts_viz_server_resource_status",
+      "scripts_viz_server_root",
+      "scripts_viz_server_run_https",
+      "scripts_viz_server_viz4d_get_corrections",
+      "scripts_viz_server_viz4d_save_correction",
+      "scripts_viz_server_viz_4d_page",
+      "scripts_viz_server_viz_page"
+    ],
+    "1": [
+      "backup_dashboard_main",
+      "backup_dashboard_main_get_dashboard",
+      "backup_dashboard_main_lifespan",
+      "backup_dashboard_main_py_fastapi",
+      "backup_dashboard_main_py_request",
+      "backup_dashboard_main_py_websocket",
+      "backup_dashboard_main_rationale_18",
+      "backup_dashboard_main_update_robot_data",
+      "backup_dashboard_main_websocket_endpoint"
+    ],
+    "2": [
+      "backups_2026_04_27_final_ik_rviz_scripts_sim_ros2_ik",
+      "backups_2026_04_27_final_ik_rviz_scripts_sim_ros2_ik_dualarmiknode",
+      "backups_2026_04_27_final_ik_rviz_scripts_sim_ros2_ik_dualarmiknode_init",
+      "backups_2026_04_27_final_ik_rviz_scripts_sim_ros2_ik_dualarmiknode_left_cmd_callback",
+      "backups_2026_04_27_final_ik_rviz_scripts_sim_ros2_ik_dualarmiknode_left_pose_callback",
+      "backups_2026_04_27_final_ik_rviz_scripts_sim_ros2_ik_dualarmiknode_right_cmd_callback",
+      "backups_2026_04_27_final_ik_rviz_scripts_sim_ros2_ik_dualarmiknode_right_pose_callback",
+      "backups_2026_04_27_final_ik_rviz_scripts_sim_ros2_ik_py_node",
+      "backups_2026_04_27_final_ik_rviz_scripts_sim_ros2_ik_run_ros2_ik"
+    ],
+    "3": [
+      "dashboard_main",
+      "dashboard_main_get_dashboard",
+      "dashboard_main_lifespan",
+      "dashboard_main_py_fastapi",
+      "dashboard_main_py_request",
+      "dashboard_main_py_websocket",
+      "dashboard_main_rationale_18",
+      "dashboard_main_update_robot_data",
+      "dashboard_main_websocket_endpoint"
+    ],
+    "4": [
+      "scripts_rviz_interactive_marker",
+      "scripts_rviz_interactive_marker_dualarminteractivemarker",
+      "scripts_rviz_interactive_marker_dualarminteractivemarker_create_marker",
+      "scripts_rviz_interactive_marker_dualarminteractivemarker_init",
+      "scripts_rviz_interactive_marker_dualarminteractivemarker_left_hand_callback",
+      "scripts_rviz_interactive_marker_dualarminteractivemarker_process_feedback",
+      "scripts_rviz_interactive_marker_dualarminteractivemarker_right_hand_callback",
+      "scripts_rviz_interactive_marker_main",
+      "scripts_rviz_interactive_marker_py_node"
+    ],
+    "5": [
+      "scripts_sim_ros2_ik",
+      "scripts_sim_ros2_ik_dualarmiknode",
+      "scripts_sim_ros2_ik_dualarmiknode_init",
+      "scripts_sim_ros2_ik_dualarmiknode_left_cmd_callback",
+      "scripts_sim_ros2_ik_dualarmiknode_left_pose_callback",
+      "scripts_sim_ros2_ik_dualarmiknode_right_cmd_callback",
+      "scripts_sim_ros2_ik_dualarmiknode_right_pose_callback",
+      "scripts_sim_ros2_ik_py_node",
+      "scripts_sim_ros2_ik_run_ros2_ik"
+    ],
+    "6": [
+      "backups_2026_04_27_final_ik_rviz_scripts_rviz_interactive_marker",
+      "backups_2026_04_27_final_ik_rviz_scripts_rviz_interactive_marker_dualarminteractivemarker",
+      "backups_2026_04_27_final_ik_rviz_scripts_rviz_interactive_marker_dualarminteractivemarker_create_marker",
+      "backups_2026_04_27_final_ik_rviz_scripts_rviz_interactive_marker_dualarminteractivemarker_init",
+      "backups_2026_04_27_final_ik_rviz_scripts_rviz_interactive_marker_dualarminteractivemarker_process_feedback",
+      "backups_2026_04_27_final_ik_rviz_scripts_rviz_interactive_marker_main",
+      "backups_2026_04_27_final_ik_rviz_scripts_rviz_interactive_marker_py_node"
+    ],
+    "7": [
+      "scripts_viz4d_layout",
+      "scripts_viz4d_layout_compute_4d",
+      "scripts_viz4d_layout_rationale_1",
+      "scripts_viz4d_layout_rationale_13"
+    ],
+    "8": [
+      "backup_scripts_setup_can",
+      "backup_scripts_setup_can_setup_can",
+      "backup_scripts_setup_can_sh__entry"
+    ],
+    "9": [
+      "backups_2026_04_27_final_ik_rviz_scripts_setup_can",
+      "backups_2026_04_27_final_ik_rviz_scripts_setup_can_setup_can",
+      "backups_2026_04_27_final_ik_rviz_scripts_setup_can_sh__entry"
+    ],
+    "10": [
+      "backups_2026_04_27_ik_backup_scripts_setup_can",
+      "backups_2026_04_27_ik_backup_scripts_setup_can_setup_can",
+      "backups_2026_04_27_ik_backup_scripts_setup_can_sh__entry"
+    ],
+    "11": [
+      "scripts_setup_can",
+      "scripts_setup_can_setup_can",
+      "scripts_setup_can_sh__entry"
+    ],
+    "12": [
+      "backup_scripts_check_can",
+      "backup_scripts_check_can_scan_can"
+    ],
+    "13": [
+      "backup_scripts_run_dashboard",
+      "backup_scripts_run_dashboard_sh__entry"
+    ],
+    "14": [
+      "backup_scripts_setup_ports",
+      "backup_scripts_setup_ports_sh__entry"
+    ],
+    "15": [
+      "backup_scripts_sim_dual_arm",
+      "backup_scripts_sim_dual_arm_run_sim"
+    ],
+    "16": [
+      "backup_scripts_start_all",
+      "backup_scripts_start_all_sh__entry"
+    ],
+    "17": [
+      "backups_2026_04_27_alignment_fixed_setup_venv",
+      "backups_2026_04_27_alignment_fixed_setup_venv_sh__entry"
+    ],
+    "18": [
+      "backups_2026_04_27_alignment_fixed_sim_dual_arm",
+      "backups_2026_04_27_alignment_fixed_sim_dual_arm_run_sim"
+    ],
+    "19": [
+      "backups_2026_04_27_final_ik_rviz_scratch_build_mjcf",
+      "backups_2026_04_27_final_ik_rviz_scratch_build_mjcf_rationale_1"
+    ],
+    "20": [
+      "backups_2026_04_27_final_ik_rviz_scratch_check_env",
+      "backups_2026_04_27_final_ik_rviz_scratch_check_env_check"
+    ],
+    "21": [
+      "backups_2026_04_27_final_ik_rviz_scratch_debug_mujoco",
+      "backups_2026_04_27_final_ik_rviz_scratch_debug_mujoco_debug"
+    ],
+    "22": [
+      "backups_2026_04_27_final_ik_rviz_scripts_check_can",
+      "backups_2026_04_27_final_ik_rviz_scripts_check_can_scan_can"
+    ],
+    "23": [
+      "backups_2026_04_27_final_ik_rviz_scripts_launch_rviz_robot",
+      "backups_2026_04_27_final_ik_rviz_scripts_launch_rviz_robot_sh__entry"
+    ],
+    "24": [
+      "backups_2026_04_27_final_ik_rviz_scripts_run_dashboard",
+      "backups_2026_04_27_final_ik_rviz_scripts_run_dashboard_sh__entry"
+    ],
+    "25": [
+      "backups_2026_04_27_final_ik_rviz_scripts_setup_ports",
+      "backups_2026_04_27_final_ik_rviz_scripts_setup_ports_sh__entry"
+    ],
+    "26": [
+      "backups_2026_04_27_final_ik_rviz_scripts_setup_venv",
+      "backups_2026_04_27_final_ik_rviz_scripts_setup_venv_sh__entry"
+    ],
+    "27": [
+      "backups_2026_04_27_final_ik_rviz_scripts_sim_dual_arm",
+      "backups_2026_04_27_final_ik_rviz_scripts_sim_dual_arm_run_sim"
+    ],
+    "28": [
+      "backups_2026_04_27_final_ik_rviz_scripts_sim_interactive_ik",
+      "backups_2026_04_27_final_ik_rviz_scripts_sim_interactive_ik_run_interactive_ik"
+    ],
+    "29": [
+      "backups_2026_04_27_final_ik_rviz_scripts_start_all",
+      "backups_2026_04_27_final_ik_rviz_scripts_start_all_sh__entry"
+    ],
+    "30": [
+      "backups_2026_04_27_final_ik_rviz_scripts_teleop_left",
+      "backups_2026_04_27_final_ik_rviz_scripts_teleop_left_sh__entry"
+    ],
+    "31": [
+      "backups_2026_04_27_ik_backup_scratch_build_mjcf",
+      "backups_2026_04_27_ik_backup_scratch_build_mjcf_rationale_1"
+    ],
+    "32": [
+      "backups_2026_04_27_ik_backup_scratch_check_env",
+      "backups_2026_04_27_ik_backup_scratch_check_env_check"
+    ],
+    "33": [
+      "backups_2026_04_27_ik_backup_scratch_debug_mujoco",
+      "backups_2026_04_27_ik_backup_scratch_debug_mujoco_debug"
+    ],
+    "34": [
+      "backups_2026_04_27_ik_backup_scripts_check_can",
+      "backups_2026_04_27_ik_backup_scripts_check_can_scan_can"
+    ],
+    "35": [
+      "backups_2026_04_27_ik_backup_scripts_run_dashboard",
+      "backups_2026_04_27_ik_backup_scripts_run_dashboard_sh__entry"
+    ],
+    "36": [
+      "backups_2026_04_27_ik_backup_scripts_setup_ports",
+      "backups_2026_04_27_ik_backup_scripts_setup_ports_sh__entry"
+    ],
+    "37": [
+      "backups_2026_04_27_ik_backup_scripts_setup_venv",
+      "backups_2026_04_27_ik_backup_scripts_setup_venv_sh__entry"
+    ],
+    "38": [
+      "backups_2026_04_27_ik_backup_scripts_sim_dual_arm",
+      "backups_2026_04_27_ik_backup_scripts_sim_dual_arm_run_sim"
+    ],
+    "39": [
+      "backups_2026_04_27_ik_backup_scripts_sim_interactive_ik",
+      "backups_2026_04_27_ik_backup_scripts_sim_interactive_ik_run_interactive_ik"
+    ],
+    "40": [
+      "backups_2026_04_27_ik_backup_scripts_start_all",
+      "backups_2026_04_27_ik_backup_scripts_start_all_sh__entry"
+    ],
+    "41": [
+      "backups_sim_dual_arm_final_v4",
+      "backups_sim_dual_arm_final_v4_run_sim"
+    ],
+    "42": [
+      "scratch_build_mjcf",
+      "scratch_build_mjcf_rationale_1"
+    ],
+    "43": [
+      "scratch_check_env",
+      "scratch_check_env_check"
+    ],
+    "44": [
+      "scratch_debug_mujoco",
+      "scratch_debug_mujoco_debug"
+    ],
+    "45": [
+      "scripts_check_can",
+      "scripts_check_can_scan_can"
+    ],
+    "46": [
+      "scripts_launch_rviz_robot",
+      "scripts_launch_rviz_robot_sh__entry"
+    ],
+    "47": [
+      "scripts_run_dashboard",
+      "scripts_run_dashboard_sh__entry"
+    ],
+    "48": [
+      "scripts_setup_ports",
+      "scripts_setup_ports_sh__entry"
+    ],
+    "49": [
+      "scripts_setup_venv",
+      "scripts_setup_venv_sh__entry"
+    ],
+    "50": [
+      "scripts_sim_dual_arm",
+      "scripts_sim_dual_arm_run_sim"
+    ],
+    "51": [
+      "scripts_sim_interactive_ik",
+      "scripts_sim_interactive_ik_run_interactive_ik"
+    ],
+    "52": [
+      "scripts_start_all",
+      "scripts_start_all_sh__entry"
+    ],
+    "53": [
+      "scripts_start_full_sim",
+      "scripts_start_full_sim_sh__entry"
+    ],
+    "54": [
+      "scripts_teleop_left",
+      "scripts_teleop_left_sh__entry"
+    ],
+    "55": [
+      "scripts_viz_screenshot",
+      "scripts_viz_screenshot_shoot"
+    ],
+    "56": [
+      "backups_2026_04_27_final_ik_rviz_scratch_analyze_meshes"
+    ],
+    "57": [
+      "backups_2026_04_27_final_ik_rviz_scratch_check_bodies"
+    ],
+    "58": [
+      "backups_2026_04_27_ik_backup_scratch_analyze_meshes"
+    ],
+    "59": [
+      "backups_2026_04_27_ik_backup_scratch_check_bodies"
+    ],
+    "60": [
+      "scratch_analyze_meshes"
+    ],
+    "61": [
+      "scratch_check_bodies"
+    ],
+    "62": [
+      "scripts_viz4d_init"
+    ],
+    "63": [
+      "scripts_viz4d_page"
+    ]
+  },
+  "cohesion": {
+    "0": 0.12688172043010754,
+    "1": 0.2777777777777778,
+    "2": 0.25,
+    "3": 0.2777777777777778,
+    "4": 0.2777777777777778,
+    "5": 0.25,
+    "6": 0.38095238095238093,
+    "7": 0.5,
+    "8": 1.0,
+    "9": 1.0,
+    "10": 1.0,
+    "11": 1.0,
+    "12": 1.0,
+    "13": 1.0,
+    "14": 1.0,
+    "15": 1.0,
+    "16": 1.0,
+    "17": 1.0,
+    "18": 1.0,
+    "19": 1.0,
+    "20": 1.0,
+    "21": 1.0,
+    "22": 1.0,
+    "23": 1.0,
+    "24": 1.0,
+    "25": 1.0,
+    "26": 1.0,
+    "27": 1.0,
+    "28": 1.0,
+    "29": 1.0,
+    "30": 1.0,
+    "31": 1.0,
+    "32": 1.0,
+    "33": 1.0,
+    "34": 1.0,
+    "35": 1.0,
+    "36": 1.0,
+    "37": 1.0,
+    "38": 1.0,
+    "39": 1.0,
+    "40": 1.0,
+    "41": 1.0,
+    "42": 1.0,
+    "43": 1.0,
+    "44": 1.0,
+    "45": 1.0,
+    "46": 1.0,
+    "47": 1.0,
+    "48": 1.0,
+    "49": 1.0,
+    "50": 1.0,
+    "51": 1.0,
+    "52": 1.0,
+    "53": 1.0,
+    "54": 1.0,
+    "55": 1.0,
+    "56": 1.0,
+    "57": 1.0,
+    "58": 1.0,
+    "59": 1.0,
+    "60": 1.0,
+    "61": 1.0,
+    "62": 1.0,
+    "63": 1.0
+  },
+  "gods": [
+    {
+      "id": "scripts_viz_server_layout",
+      "label": "layout()",
+      "degree": 11
+    },
+    {
+      "id": "backups_2026_04_27_final_ik_rviz_scripts_sim_ros2_ik_dualarmiknode",
+      "label": "DualArmIKNode",
+      "degree": 8
+    },
+    {
+      "id": "scripts_rviz_interactive_marker_dualarminteractivemarker",
+      "label": "DualArmInteractiveMarker",
+      "degree": 8
+    },
+    {
+      "id": "scripts_sim_ros2_ik_dualarmiknode",
+      "label": "DualArmIKNode",
+      "degree": 8
+    },
+    {
+      "id": "scripts_viz_server_force_layout_3d",
+      "label": "force_layout_3d()",
+      "degree": 7
+    },
+    {
+      "id": "backups_2026_04_27_final_ik_rviz_scripts_rviz_interactive_marker_dualarminteractivemarker",
+      "label": "DualArmInteractiveMarker",
+      "degree": 6
+    },
+    {
+      "id": "scripts_viz4d_layout_compute_4d",
+      "label": "compute_4d()",
+      "degree": 4
+    },
+    {
+      "id": "scripts_viz_server_get_resource",
+      "label": "get_resource()",
+      "degree": 4
+    },
+    {
+      "id": "scripts_viz_server_resource_status",
+      "label": "resource_status()",
+      "degree": 4
+    },
+    {
+      "id": "scripts_viz_server_heartbeat_loop",
+      "label": "_heartbeat_loop()",
+      "degree": 4
+    }
+  ],
+  "surprises": [
+    {
+      "source": "layout()",
+      "target": "compute_4d()",
+      "source_files": [
+        "scripts/viz_server.py",
+        "scripts/viz4d/layout.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `compute_4d()` connect `compute_4d` to `viz_server.py`?",
+      "why": "High betweenness centrality (0.005) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `layout()` connect `viz_server.py` to `compute_4d`?",
+      "why": "High betweenness centrality (0.002) - this node is a cross-community bridge."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 4 inferred relationships involving `layout()` (e.g. with `force_layout_3d()` and `_layout_keywords()`) actually correct?",
+      "why": "`layout()` has 4 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `run_dashboard.sh script`, `setup_ports.sh script`, `start_all.sh script` to the rest of the system?",
+      "why": "21 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `viz_server.py` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.12688172043010754 - nodes in this community are weakly interconnected."
+    }
+  ]
+}

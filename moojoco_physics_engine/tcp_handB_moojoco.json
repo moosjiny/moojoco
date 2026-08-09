@@ -1,0 +1,27 @@
+{
+  "handName": "Hand B",
+  "px": 0.007,
+  "py": 0.085574,
+  "pz": 0.05,
+  "rx": 0.0,
+  "ry": -0.0,
+  "rz": 3.14159,
+  "palm_mass_kg": 0.35,
+  "finger_mass_kg": {
+    "thumb": 0.0031,
+    "index": 0.0036,
+    "middle": 0.0038,
+    "ring": 0.0035,
+    "pinky": 0.003
+  },
+  "measured_contact_force_n": {
+    "thumb": 0.038767,
+    "index": 0.0,
+    "middle": 0.0,
+    "ring": 0.0,
+    "pinky": 0.03873
+  },
+  "measured_worst_penetration_m": -0.000974,
+  "measured_worst_penetration_ratio_of_radius": 0.1623,
+  "source": "MuJoCo mj_step physics integration (real mass/force/contact), not scripted interpolation"
+}

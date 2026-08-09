@@ -1,0 +1,327 @@
+{
+  ".claude/settings.local.json": {
+    "mtime": 1784412507.4530234,
+    "ast_hash": "bdf907d950f8f2c0a17aa744ed1dbc99",
+    "semantic_hash": "bdf907d950f8f2c0a17aa744ed1dbc99"
+  },
+  "backup/dashboard/main.py": {
+    "mtime": 1782084296.044895,
+    "ast_hash": "890e995b6753480b80c728d9c6833c8f",
+    "semantic_hash": "890e995b6753480b80c728d9c6833c8f"
+  },
+  "backup/scripts/check_can.py": {
+    "mtime": 1782084296.0447822,
+    "ast_hash": "af5f8e12eaeb18f470dfb0f5240f3170",
+    "semantic_hash": "af5f8e12eaeb18f470dfb0f5240f3170"
+  },
+  "backup/scripts/run_dashboard.sh": {
+    "mtime": 1782084296.044668,
+    "ast_hash": "f53f2d99e0caa23378c43c1f73e6be3f",
+    "semantic_hash": "f53f2d99e0caa23378c43c1f73e6be3f"
+  },
+  "backup/scripts/setup_can.sh": {
+    "mtime": 1782084296.0447059,
+    "ast_hash": "7e907f0bedadceee3b692ed854ae27c1",
+    "semantic_hash": "7e907f0bedadceee3b692ed854ae27c1"
+  },
+  "backup/scripts/setup_ports.sh": {
+    "mtime": 1782084296.0448165,
+    "ast_hash": "32815236fd0ea85a593831b0b3140dd0",
+    "semantic_hash": "32815236fd0ea85a593831b0b3140dd0"
+  },
+  "backup/scripts/sim_dual_arm.py": {
+    "mtime": 1782084296.0448558,
+    "ast_hash": "a9ca01c5d34fafc383272c4e9f3baa39",
+    "semantic_hash": "a9ca01c5d34fafc383272c4e9f3baa39"
+  },
+  "backup/scripts/start_all.sh": {
+    "mtime": 1782084296.0447443,
+    "ast_hash": "9e38728aa0dc97c41e84aee3c81272eb",
+    "semantic_hash": "9e38728aa0dc97c41e84aee3c81272eb"
+  },
+  "backups/2026-04-27_alignment_fixed/setup_venv.sh": {
+    "mtime": 1782084296.0449355,
+    "ast_hash": "997c79919fa8e4348f3f5f4958214511",
+    "semantic_hash": "997c79919fa8e4348f3f5f4958214511"
+  },
+  "backups/2026-04-27_alignment_fixed/sim_dual_arm.py": {
+    "mtime": 1782084296.0450325,
+    "ast_hash": "8f1fe158274825e104703c8ab6ea7d8b",
+    "semantic_hash": "8f1fe158274825e104703c8ab6ea7d8b"
+  },
+  "backups/2026-04-27_final_ik_rviz/scratch/analyze_meshes.py": {
+    "mtime": 1782084296.046076,
+    "ast_hash": "c598a7fc9ff011057bae02bc749da557",
+    "semantic_hash": "c598a7fc9ff011057bae02bc749da557"
+  },
+  "backups/2026-04-27_final_ik_rviz/scratch/build_mjcf.py": {
+    "mtime": 1782084296.0460434,
+    "ast_hash": "2c749e76c1f60904a40a7029b0b51dad",
+    "semantic_hash": "2c749e76c1f60904a40a7029b0b51dad"
+  },
+  "backups/2026-04-27_final_ik_rviz/scratch/check_bodies.py": {
+    "mtime": 1782084296.0459723,
+    "ast_hash": "09a4299208c9c7f7f95906939f6b8a7b",
+    "semantic_hash": "09a4299208c9c7f7f95906939f6b8a7b"
+  },
+  "backups/2026-04-27_final_ik_rviz/scratch/check_env.py": {
+    "mtime": 1782084296.0460057,
+    "ast_hash": "953cdf1afa4d33f89d7561bbc0fb62be",
+    "semantic_hash": "953cdf1afa4d33f89d7561bbc0fb62be"
+  },
+  "backups/2026-04-27_final_ik_rviz/scratch/debug_mujoco.py": {
+    "mtime": 1782084296.045933,
+    "ast_hash": "85dfbd7a7a211e7ebcad1dcc2c9af656",
+    "semantic_hash": "85dfbd7a7a211e7ebcad1dcc2c9af656"
+  },
+  "backups/2026-04-27_final_ik_rviz/scripts/check_can.py": {
+    "mtime": 1782084296.0456727,
+    "ast_hash": "af5f8e12eaeb18f470dfb0f5240f3170",
+    "semantic_hash": "af5f8e12eaeb18f470dfb0f5240f3170"
+  },
+  "backups/2026-04-27_final_ik_rviz/scripts/launch_rviz_robot.sh": {
+    "mtime": 1782084296.0458388,
+    "ast_hash": "229c910aa92732e0f01d3f56a0656742",
+    "semantic_hash": "229c910aa92732e0f01d3f56a0656742"
+  },
+  "backups/2026-04-27_final_ik_rviz/scripts/run_dashboard.sh": {
+    "mtime": 1782084296.04556,
+    "ast_hash": "30e3de125460a31b5de2496e4e03745a",
+    "semantic_hash": "30e3de125460a31b5de2496e4e03745a"
+  },
+  "backups/2026-04-27_final_ik_rviz/scripts/rviz_interactive_marker.py": {
+    "mtime": 1782084296.0457525,
+    "ast_hash": "dd0396a34d391d687f9f261bf6cfdae2",
+    "semantic_hash": "dd0396a34d391d687f9f261bf6cfdae2"
+  },
+  "backups/2026-04-27_final_ik_rviz/scripts/setup_can.sh": {
+    "mtime": 1782084296.045597,
+    "ast_hash": "7e907f0bedadceee3b692ed854ae27c1",
+    "semantic_hash": "7e907f0bedadceee3b692ed854ae27c1"
+  },
+  "backups/2026-04-27_final_ik_rviz/scripts/setup_ports.sh": {
+    "mtime": 1782084296.0457096,
+    "ast_hash": "32815236fd0ea85a593831b0b3140dd0",
+    "semantic_hash": "32815236fd0ea85a593831b0b3140dd0"
+  },
+  "backups/2026-04-27_final_ik_rviz/scripts/setup_venv.sh": {
+    "mtime": 1782084296.04543,
+    "ast_hash": "e01f3f044aa801eb4af8b9e9149a6d2f",
+    "semantic_hash": "e01f3f044aa801eb4af8b9e9149a6d2f"
+  },
+  "backups/2026-04-27_final_ik_rviz/scripts/sim_dual_arm.py": {
+    "mtime": 1782084296.0458815,
+    "ast_hash": "4b6ce43f2d44a94039a5d05bcc4f3bec",
+    "semantic_hash": "4b6ce43f2d44a94039a5d05bcc4f3bec"
+  },
+  "backups/2026-04-27_final_ik_rviz/scripts/sim_interactive_ik.py": {
+    "mtime": 1782084296.0457957,
+    "ast_hash": "313d57940ff84cce74851f7290bed415",
+    "semantic_hash": "313d57940ff84cce74851f7290bed415"
+  },
+  "backups/2026-04-27_final_ik_rviz/scripts/sim_ros2_ik.py": {
+    "mtime": 1782084296.0454743,
+    "ast_hash": "588f928d8aef0719eaab21ade292e1c8",
+    "semantic_hash": "588f928d8aef0719eaab21ade292e1c8"
+  },
+  "backups/2026-04-27_final_ik_rviz/scripts/start_all.sh": {
+    "mtime": 1782084296.045635,
+    "ast_hash": "3b22c0875e872ffc3a3400eb6ea90718",
+    "semantic_hash": "3b22c0875e872ffc3a3400eb6ea90718"
+  },
+  "backups/2026-04-27_final_ik_rviz/scripts/teleop_left.sh": {
+    "mtime": 1782084296.0455244,
+    "ast_hash": "acceb937b1a619c3466bbd84a369e7fa",
+    "semantic_hash": "acceb937b1a619c3466bbd84a369e7fa"
+  },
+  "backups/2026-04-27_ik_backup/scratch/analyze_meshes.py": {
+    "mtime": 1782084296.045215,
+    "ast_hash": "c598a7fc9ff011057bae02bc749da557",
+    "semantic_hash": "c598a7fc9ff011057bae02bc749da557"
+  },
+  "backups/2026-04-27_ik_backup/scratch/build_mjcf.py": {
+    "mtime": 1782084296.0451803,
+    "ast_hash": "baa0516411924df396188c6353a557bf",
+    "semantic_hash": "baa0516411924df396188c6353a557bf"
+  },
+  "backups/2026-04-27_ik_backup/scratch/check_bodies.py": {
+    "mtime": 1782084296.0451088,
+    "ast_hash": "09a4299208c9c7f7f95906939f6b8a7b",
+    "semantic_hash": "09a4299208c9c7f7f95906939f6b8a7b"
+  },
+  "backups/2026-04-27_ik_backup/scratch/check_env.py": {
+    "mtime": 1782084296.0451417,
+    "ast_hash": "953cdf1afa4d33f89d7561bbc0fb62be",
+    "semantic_hash": "953cdf1afa4d33f89d7561bbc0fb62be"
+  },
+  "backups/2026-04-27_ik_backup/scratch/debug_mujoco.py": {
+    "mtime": 1782084296.0450752,
+    "ast_hash": "85dfbd7a7a211e7ebcad1dcc2c9af656",
+    "semantic_hash": "85dfbd7a7a211e7ebcad1dcc2c9af656"
+  },
+  "backups/2026-04-27_ik_backup/scripts/check_can.py": {
+    "mtime": 1782084296.0464191,
+    "ast_hash": "af5f8e12eaeb18f470dfb0f5240f3170",
+    "semantic_hash": "af5f8e12eaeb18f470dfb0f5240f3170"
+  },
+  "backups/2026-04-27_ik_backup/scripts/run_dashboard.sh": {
+    "mtime": 1782084296.046314,
+    "ast_hash": "30e3de125460a31b5de2496e4e03745a",
+    "semantic_hash": "30e3de125460a31b5de2496e4e03745a"
+  },
+  "backups/2026-04-27_ik_backup/scripts/setup_can.sh": {
+    "mtime": 1782084296.046347,
+    "ast_hash": "7e907f0bedadceee3b692ed854ae27c1",
+    "semantic_hash": "7e907f0bedadceee3b692ed854ae27c1"
+  },
+  "backups/2026-04-27_ik_backup/scripts/setup_ports.sh": {
+    "mtime": 1782084296.0464523,
+    "ast_hash": "32815236fd0ea85a593831b0b3140dd0",
+    "semantic_hash": "32815236fd0ea85a593831b0b3140dd0"
+  },
+  "backups/2026-04-27_ik_backup/scripts/setup_venv.sh": {
+    "mtime": 1782084296.0462794,
+    "ast_hash": "e01f3f044aa801eb4af8b9e9149a6d2f",
+    "semantic_hash": "e01f3f044aa801eb4af8b9e9149a6d2f"
+  },
+  "backups/2026-04-27_ik_backup/scripts/sim_dual_arm.py": {
+    "mtime": 1782084296.0465324,
+    "ast_hash": "a88d4a98f8bce425b11b0178b11ca954",
+    "semantic_hash": "a88d4a98f8bce425b11b0178b11ca954"
+  },
+  "backups/2026-04-27_ik_backup/scripts/sim_interactive_ik.py": {
+    "mtime": 1782084296.0464923,
+    "ast_hash": "2440a4b67714ffe6d84cf641e123e7d5",
+    "semantic_hash": "2440a4b67714ffe6d84cf641e123e7d5"
+  },
+  "backups/2026-04-27_ik_backup/scripts/start_all.sh": {
+    "mtime": 1782084296.046381,
+    "ast_hash": "3b22c0875e872ffc3a3400eb6ea90718",
+    "semantic_hash": "3b22c0875e872ffc3a3400eb6ea90718"
+  },
+  "backups/sim_dual_arm_final_v4.py": {
+    "mtime": 1782084296.04429,
+    "ast_hash": "5b47ebc36d350c71eab7b73e91851668",
+    "semantic_hash": "5b47ebc36d350c71eab7b73e91851668"
+  },
+  "dashboard/main.py": {
+    "mtime": 1782084296.044331,
+    "ast_hash": "890e995b6753480b80c728d9c6833c8f",
+    "semantic_hash": "890e995b6753480b80c728d9c6833c8f"
+  },
+  "scratch/analyze_meshes.py": {
+    "mtime": 1782084296.0445118,
+    "ast_hash": "c598a7fc9ff011057bae02bc749da557",
+    "semantic_hash": "c598a7fc9ff011057bae02bc749da557"
+  },
+  "scratch/build_mjcf.py": {
+    "mtime": 1782084296.0444815,
+    "ast_hash": "137c1962d3fd18a6d861805e73949abe",
+    "semantic_hash": "137c1962d3fd18a6d861805e73949abe"
+  },
+  "scratch/check_bodies.py": {
+    "mtime": 1782084296.044407,
+    "ast_hash": "09a4299208c9c7f7f95906939f6b8a7b",
+    "semantic_hash": "09a4299208c9c7f7f95906939f6b8a7b"
+  },
+  "scratch/check_env.py": {
+    "mtime": 1782084296.044443,
+    "ast_hash": "953cdf1afa4d33f89d7561bbc0fb62be",
+    "semantic_hash": "953cdf1afa4d33f89d7561bbc0fb62be"
+  },
+  "scratch/debug_mujoco.py": {
+    "mtime": 1782084296.04437,
+    "ast_hash": "85dfbd7a7a211e7ebcad1dcc2c9af656",
+    "semantic_hash": "85dfbd7a7a211e7ebcad1dcc2c9af656"
+  },
+  "scripts/check_can.py": {
+    "mtime": 1782084296.0439184,
+    "ast_hash": "af5f8e12eaeb18f470dfb0f5240f3170",
+    "semantic_hash": "af5f8e12eaeb18f470dfb0f5240f3170"
+  },
+  "scripts/launch_rviz_robot.sh": {
+    "mtime": 1782084296.0441241,
+    "ast_hash": "229c910aa92732e0f01d3f56a0656742",
+    "semantic_hash": "229c910aa92732e0f01d3f56a0656742"
+  },
+  "scripts/run_dashboard.sh": {
+    "mtime": 1782084296.0434573,
+    "ast_hash": "30e3de125460a31b5de2496e4e03745a",
+    "semantic_hash": "30e3de125460a31b5de2496e4e03745a"
+  },
+  "scripts/rviz_interactive_marker.py": {
+    "mtime": 1782084296.043991,
+    "ast_hash": "6e69e60a7915ceb97046d84111c082fc",
+    "semantic_hash": "6e69e60a7915ceb97046d84111c082fc"
+  },
+  "scripts/setup_can.sh": {
+    "mtime": 1782084296.043489,
+    "ast_hash": "7e907f0bedadceee3b692ed854ae27c1",
+    "semantic_hash": "7e907f0bedadceee3b692ed854ae27c1"
+  },
+  "scripts/setup_ports.sh": {
+    "mtime": 1782084296.0439525,
+    "ast_hash": "32815236fd0ea85a593831b0b3140dd0",
+    "semantic_hash": "32815236fd0ea85a593831b0b3140dd0"
+  },
+  "scripts/setup_venv.sh": {
+    "mtime": 1782084296.0433216,
+    "ast_hash": "e01f3f044aa801eb4af8b9e9149a6d2f",
+    "semantic_hash": "e01f3f044aa801eb4af8b9e9149a6d2f"
+  },
+  "scripts/sim_dual_arm.py": {
+    "mtime": 1782137700.5387738,
+    "ast_hash": "70dc20fcc921c0b86a4fb047ce488b6e",
+    "semantic_hash": "70dc20fcc921c0b86a4fb047ce488b6e"
+  },
+  "scripts/sim_interactive_ik.py": {
+    "mtime": 1782084296.0440414,
+    "ast_hash": "313d57940ff84cce74851f7290bed415",
+    "semantic_hash": "313d57940ff84cce74851f7290bed415"
+  },
+  "scripts/sim_ros2_ik.py": {
+    "mtime": 1782084296.043364,
+    "ast_hash": "d6a65353fbe48a1945262a927a2a90ab",
+    "semantic_hash": "d6a65353fbe48a1945262a927a2a90ab"
+  },
+  "scripts/start_all.sh": {
+    "mtime": 1782084296.0438724,
+    "ast_hash": "3b22c0875e872ffc3a3400eb6ea90718",
+    "semantic_hash": "3b22c0875e872ffc3a3400eb6ea90718"
+  },
+  "scripts/start_full_sim.sh": {
+    "mtime": 1782084296.0440826,
+    "ast_hash": "2f611ade5a48c1f6d159fc9179fc2a59",
+    "semantic_hash": "2f611ade5a48c1f6d159fc9179fc2a59"
+  },
+  "scripts/teleop_left.sh": {
+    "mtime": 1782084296.0434237,
+    "ast_hash": "acceb937b1a619c3466bbd84a369e7fa",
+    "semantic_hash": "acceb937b1a619c3466bbd84a369e7fa"
+  },
+  "scripts/viz4d/__init__.py": {
+    "mtime": 1784480759.607587,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "scripts/viz4d/layout.py": {
+    "mtime": 1784480619.107856,
+    "ast_hash": "e469ba1206c877910c6e13637d2a366f",
+    "semantic_hash": "e469ba1206c877910c6e13637d2a366f"
+  },
+  "scripts/viz4d/page.py": {
+    "mtime": 1784518411.986543,
+    "ast_hash": "4d28efb558daac9c973d804a59bebd92",
+    "semantic_hash": "4d28efb558daac9c973d804a59bebd92"
+  },
+  "scripts/viz_screenshot.py": {
+    "mtime": 1783494805.7794378,
+    "ast_hash": "20d923ecf06f5120daed1f2479700fbf",
+    "semantic_hash": "20d923ecf06f5120daed1f2479700fbf"
+  },
+  "scripts/viz_server.py": {
+    "mtime": 1784511011.99084,
+    "ast_hash": "ae6476f10ecaa5ee8102222afc6c3a39",
+    "semantic_hash": "ae6476f10ecaa5ee8102222afc6c3a39"
+  }
+}

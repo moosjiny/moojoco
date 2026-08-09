@@ -9,3 +9,4 @@ __pycache__/
 *.log
 scratch/ik_debug_log.csv
 cpp_hand_engine/build/
+*.key
