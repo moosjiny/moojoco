@@ -1,12 +1,12 @@
 /**
  * ROOPS (Robot Object-Oriented Programming System - OOPS)
  * Sub-Object Modular Architecture for Humanoid Robot Hands
- * Enhanced Prominent TCP 3-Axis RGB Frame Helper & Selection Highlight
+ * High-Visibility Mesh Standard & Emissive Phong Materials
  * Author: Aegis
  */
 
 class TcpFrameAxes {
-  constructor(size = 5.0) {
+  constructor(size = 5.5) {
     this.group = new THREE.Group();
 
     // Prominent Axes Helper (Red=X, Green=Y, Blue=Z)
@@ -23,7 +23,7 @@ class TcpFrameAxes {
     this.group.add(arrowY);
     this.group.add(arrowZ);
 
-    this.group.visible = true; // Always visible on hand
+    this.group.visible = true;
   }
 
   setVisible(visible) {
@@ -36,7 +36,7 @@ class TcpFrameAxes {
 }
 
 class CollisionShield {
-  constructor(geometry, color = 0x34d399, opacity = 0.7) {
+  constructor(geometry, color = 0x34d399, opacity = 0.6) {
     this.material = new THREE.MeshBasicMaterial({
       color: color,
       wireframe: true,
@@ -67,13 +67,21 @@ class FingerJointLink {
 
     const fGeo = new THREE.CylinderGeometry(radius, radius * 0.8, len, 16);
     fGeo.translate(0, len / 2, 0);
-    const fMat = new THREE.MeshStandardMaterial({ color: handColor, roughness: 0.3 });
+    
+    // HIGH-VISIBILITY EMISSIVE PHONG MATERIAL
+    const fMat = new THREE.MeshPhongMaterial({
+      color: handColor,
+      emissive: handColor,
+      emissiveIntensity: 0.35,
+      shininess: 80,
+      side: THREE.DoubleSide
+    });
     this.mesh = new THREE.Mesh(fGeo, fMat);
     this.group.add(this.mesh);
 
     const fsGeo = new THREE.CylinderGeometry(radius + 0.12, (radius * 0.8) + 0.12, len + 0.15, 12);
     fsGeo.translate(0, len / 2, 0);
-    this.shield = new CollisionShield(fsGeo, 0x34d399, 0.7);
+    this.shield = new CollisionShield(fsGeo, 0x34d399, 0.6);
     this.group.add(this.shield.getMesh());
   }
 
@@ -93,11 +101,19 @@ class FingerJointLink {
 class PalmBase {
   constructor(width, height, depth, handColor) {
     this.geometry = new THREE.BoxGeometry(width, height, depth);
-    this.material = new THREE.MeshStandardMaterial({ color: handColor, roughness: 0.2, metalness: 0.8 });
+    
+    // HIGH-VISIBILITY EMISSIVE PHONG MATERIAL
+    this.material = new THREE.MeshPhongMaterial({
+      color: handColor,
+      emissive: handColor,
+      emissiveIntensity: 0.35,
+      shininess: 90,
+      side: THREE.DoubleSide
+    });
     this.mesh = new THREE.Mesh(this.geometry, this.material);
 
     const shieldGeo = new THREE.BoxGeometry(width + 0.3, height + 0.3, depth + 0.3);
-    this.shield = new CollisionShield(shieldGeo, 0x34d399, 0.6);
+    this.shield = new CollisionShield(shieldGeo, 0x34d399, 0.5);
     this.mesh.add(this.shield.getMesh());
   }
 
@@ -120,9 +136,9 @@ class RobotHandObject {
     this.group.name = name;
 
     this.internalState = {
-      px: isFacingRotated ? 0.25 : -0.25,
+      px: isFacingRotated ? 0.10 : -0.10,
       py: 3.0,
-      pz: isFacingRotated ? 4.0 : -4.0,
+      pz: isFacingRotated ? 0.60 : -0.60,
       rx: 0.0,
       ry: isFacingRotated ? Math.PI : 0.0,
       rz: 0.0,
@@ -198,8 +214,8 @@ class RobotHandObject {
   }
 
   setHighlight(visible) {
-    this.selectMesh.material.visible = visible; // Yellow Bounding Wireframe
-    this.tcpAxes.setVisible(true); // Prominent TCP RGB Axes always highlighted!
+    this.selectMesh.material.visible = visible;
+    this.tcpAxes.setVisible(true);
   }
 
   setPosition(x, y, z) {
