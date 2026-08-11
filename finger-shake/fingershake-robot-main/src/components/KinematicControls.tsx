@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DEFAULT_JOINT_ANGLES, JointAngles } from '../types';
-import { Sliders, RotateCcw, Bot, Save, FolderOpen } from 'lucide-react';
+import { Sliders, RotateCcw, Bot, Save, FolderOpen, Footprints } from 'lucide-react';
 import { soundEngine } from '../utils/audio';
 
 const MANUAL_POSE_STORAGE_KEY = 'fingershake_manual_pose_v1';
@@ -10,6 +10,8 @@ interface KinematicControlsProps {
   setAnglesAlpha: React.Dispatch<React.SetStateAction<JointAngles>>;
   anglesBeta: JointAngles;
   setAnglesBeta: React.Dispatch<React.SetStateAction<JointAngles>>;
+  groundLock: boolean;
+  setGroundLock: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export const KinematicControls: React.FC<KinematicControlsProps> = ({
@@ -17,6 +19,8 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
   setAnglesAlpha,
   anglesBeta,
   setAnglesBeta,
+  groundLock,
+  setGroundLock,
 }) => {
   const [activeTab, setActiveTab] = useState<'alpha' | 'beta'>('alpha');
   const [saveStatus, setSaveStatus] = useState<string>('');
@@ -102,8 +106,28 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
+          <button
+            onClick={() => {
+              setGroundLock((prev) => !prev);
+              soundEngine.playClick(groundLock ? 500 : 900);
+            }}
+            className={`p-1 rounded border transition-colors ${
+              groundLock
+                ? 'bg-[#0F2E1F] border-[#34d399] text-[#34d399]'
+                : 'bg-[#111113] border-[#222226] text-[#666] hover:text-[#34d399]'
+            }`}
+            title="지면 고정 — 고관절/무릎/발목 각도를 바꿔도 발바닥이 항상 바닥(y=0)에 붙도록 로봇 몸통 높이를 자동 보정 (물리엔진의 발 접촉 해석을 근사)"
+          >
+            <Footprints className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
+
+      {groundLock && (
+        <div className="text-[10px] text-center text-[#34d399] font-mono -mt-1">
+          🦶 지면 고정 ON — 다리 각도와 무관하게 발이 바닥에 고정됨
+        </div>
+      )}
 
       {saveStatus && (
         <div className="text-[10px] text-center text-[#8ab4f8] font-mono -mt-1">{saveStatus}</div>

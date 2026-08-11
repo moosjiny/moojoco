@@ -17,6 +17,7 @@ interface RobotSceneProps {
   showJointAngles: boolean;
   manualAnglesAlpha: JointAngles;
   manualAnglesBeta: JointAngles;
+  groundLock: boolean;
   onTelemetryUpdate: (data: TelemetryData) => void;
 }
 
@@ -32,6 +33,7 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
   showJointAngles,
   manualAnglesAlpha,
   manualAnglesBeta,
+  groundLock,
   onTelemetryUpdate,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -489,6 +491,31 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
           beta.leftShoulder.rotation.z = manualAnglesBeta.leftShoulderRoll * degToRad;
           beta.leftElbow.rotation.x = manualAnglesBeta.leftElbowFlexion * degToRad;
 
+          // Ground Lock — hip/knee/ankle rotations alone make the foot sole float
+          // above or sink through the floor plane (y=0), because nothing here is an
+          // actual physics engine resolving ground contact. This reproduces what a
+          // physics engine's contact solver would do: forward-kinematically compute
+          // where the sole point ends up, then vertically translate the whole robot
+          // root by the difference so the sole always rests exactly on y=0.
+          const applyGroundLock = (robot: RobotJointRefs) => {
+            robot.root.position.y = 0;
+            robot.root.updateMatrixWorld(true);
+            // Sole point in the ankle's local frame: footMesh is a child of the ankle
+            // group at local (0, -0.04, 0.05) with box height 0.09, so its bottom face
+            // center sits at local y = -0.04 - 0.09/2 = -0.085 (see RobotBuilder.ts).
+            const soleLocal = new THREE.Vector3(0, -0.085, 0.05);
+            const soleWorldY = robot.rightAnkle.localToWorld(soleLocal).y;
+            robot.root.position.y = -soleWorldY;
+          };
+
+          if (groundLock) {
+            applyGroundLock(alpha);
+            applyGroundLock(beta);
+          } else {
+            alpha.root.position.y = 0;
+            beta.root.position.y = 0;
+          }
+
           // Independent finger clasping in Manual mode — each finger gets its own curl
           // value (thumb, index, middle, ring, pinky, matching rightFingers order) instead
           // of a single shared gripFactor. (rotation.x sign negated on the curl term so
@@ -744,7 +771,7 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
     return () => {
       if (frameIdRef.current) cancelAnimationFrame(frameIdRef.current);
     };
-  }, [isPlaying, speed, mode, manualAnglesAlpha, manualAnglesBeta]);
+  }, [isPlaying, speed, mode, manualAnglesAlpha, manualAnglesBeta, groundLock]);
 
   return (
     <div className="relative w-full h-full min-h-[400px] overflow-hidden bg-slate-950">

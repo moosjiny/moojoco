@@ -49,6 +49,11 @@ export default function App() {
     () => loadStoredManualPose()?.beta ?? DEFAULT_JOINT_ANGLES
   );
 
+  // Ground Lock — approximates a physics engine's foot-contact solve by vertically
+  // correcting the root height so the feet stay planted on the floor as hip/knee/
+  // ankle sliders change (manual mode only; see RobotScene.tsx applyGroundLock).
+  const [groundLock, setGroundLock] = useState<boolean>(false);
+
   const [telemetry, setTelemetry] = useState<TelemetryData>({
     contactDistance: 12,
     gripForce: 65,
@@ -92,6 +97,7 @@ export default function App() {
           showJointAngles={mode === 'manual'}
           manualAnglesAlpha={manualAnglesAlpha}
           manualAnglesBeta={manualAnglesBeta}
+          groundLock={groundLock}
           onTelemetryUpdate={setTelemetry}
         />
       </main>
@@ -106,6 +112,8 @@ export default function App() {
           setAnglesAlpha={setManualAnglesAlpha}
           anglesBeta={manualAnglesBeta}
           setAnglesBeta={setManualAnglesBeta}
+          groundLock={groundLock}
+          setGroundLock={setGroundLock}
         />
       )}
 
