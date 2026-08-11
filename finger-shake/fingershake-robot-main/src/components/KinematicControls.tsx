@@ -4,6 +4,7 @@ import { Sliders, RotateCcw, Bot, Save, FolderOpen, Footprints, Scale } from 'lu
 import { soundEngine } from '../utils/audio';
 
 const MANUAL_POSE_STORAGE_KEY = 'fingershake_manual_pose_v1';
+const MANUAL_POSE_BACKUP_KEY = 'fingershake_manual_pose_v1_backup';
 
 interface KinematicControlsProps {
   anglesAlpha: JointAngles;
@@ -48,6 +49,12 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
 
   const savePose = () => {
     try {
+      // Back up whatever was previously saved before overwriting it — a save
+      // is one click and, until now, irreversible.
+      const existing = localStorage.getItem(MANUAL_POSE_STORAGE_KEY);
+      if (existing) {
+        localStorage.setItem(MANUAL_POSE_BACKUP_KEY, existing);
+      }
       localStorage.setItem(
         MANUAL_POSE_STORAGE_KEY,
         JSON.stringify({ alpha: anglesAlpha, beta: anglesBeta })

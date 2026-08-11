@@ -29,7 +29,7 @@ function loadStoredManualPose(): { alpha: JointAngles; beta: JointAngles } | nul
 
 export default function App() {
   const [mode, setMode] = useState<HandshakeMode>('standard');
-  const [theme, setTheme] = useState<RobotTheme>('cyber');
+  const [theme, setTheme] = useState<RobotTheme>('titanium');
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [speed, setSpeed] = useState<number>(1.0);
   const [cameraPreset, setCameraPreset] = useState<CameraPreset>('default');
