@@ -6,19 +6,26 @@ import { soundEngine } from '../utils/audio';
 const MANUAL_POSE_STORAGE_KEY = 'fingershake_manual_pose_v1';
 const MANUAL_POSE_BACKUP_KEY = 'fingershake_manual_pose_v1_backup';
 
-// Panel is draggable/resizable (width only, height stays content-driven with
-// its own internal scroll) because the icon row overflows the old fixed
-// w-80 once enough toggles accumulate. Layout persists across reloads.
+// Panel is draggable/resizable (width and, for the slider list, height) since
+// the icon row overflowed the old fixed w-80 once enough toggles accumulated.
+// Layout persists across reloads.
 const PANEL_LAYOUT_STORAGE_KEY = 'fingershake_kinematic_panel_layout_v1';
 const PANEL_DEFAULT_WIDTH = 400;
 const PANEL_MIN_WIDTH = 280;
 const PANEL_MAX_WIDTH = 640;
 const PANEL_DEFAULT_TOP = 80; // matches the old top-20 default
+// The sliders list is the only part with a bounded, scrollable height — the
+// header/tabs/status lines above it are always fully shown. 320px matches
+// the old fixed max-h-80.
+const SLIDER_AREA_DEFAULT_HEIGHT = 320;
+const SLIDER_AREA_MIN_HEIGHT = 150;
+const SLIDER_AREA_MAX_HEIGHT = 900;
 
 interface PanelLayout {
   x: number;
   y: number;
   width: number;
+  sliderAreaHeight?: number;
 }
 
 function loadPanelLayout(): PanelLayout | null {
@@ -69,17 +76,24 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
     () => loadPanelLayout() ?? { x: Math.max(8, window.innerWidth - PANEL_DEFAULT_WIDTH - 16), y: PANEL_DEFAULT_TOP }
   );
   const [panelWidth, setPanelWidth] = useState<number>(() => loadPanelLayout()?.width ?? PANEL_DEFAULT_WIDTH);
+  const [sliderAreaHeight, setSliderAreaHeight] = useState<number>(
+    () => loadPanelLayout()?.sliderAreaHeight ?? SLIDER_AREA_DEFAULT_HEIGHT
+  );
 
   useEffect(() => {
     try {
-      localStorage.setItem(PANEL_LAYOUT_STORAGE_KEY, JSON.stringify({ ...panelPos, width: panelWidth }));
+      localStorage.setItem(
+        PANEL_LAYOUT_STORAGE_KEY,
+        JSON.stringify({ ...panelPos, width: panelWidth, sliderAreaHeight })
+      );
     } catch {
       // ignore blocked storage
     }
-  }, [panelPos, panelWidth]);
+  }, [panelPos, panelWidth, sliderAreaHeight]);
 
   const dragStateRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const resizeStateRef = useRef<{ startX: number; origWidth: number } | null>(null);
+  const vResizeStateRef = useRef<{ startY: number; origHeight: number } | null>(null);
 
   const handlePanelDragMove = (e: MouseEvent) => {
     const d = dragStateRef.current;
@@ -116,6 +130,26 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
     resizeStateRef.current = { startX: e.clientX, origWidth: panelWidth };
     window.addEventListener('mousemove', handlePanelResizeMove);
     window.addEventListener('mouseup', handlePanelResizeEnd);
+  };
+
+  const handlePanelVResizeMove = (e: MouseEvent) => {
+    const r = vResizeStateRef.current;
+    if (!r) return;
+    const maxHeight = Math.min(SLIDER_AREA_MAX_HEIGHT, window.innerHeight - panelPos.y - 160);
+    setSliderAreaHeight(
+      Math.min(Math.max(SLIDER_AREA_MIN_HEIGHT, r.origHeight + (e.clientY - r.startY)), maxHeight)
+    );
+  };
+  const handlePanelVResizeEnd = () => {
+    vResizeStateRef.current = null;
+    window.removeEventListener('mousemove', handlePanelVResizeMove);
+    window.removeEventListener('mouseup', handlePanelVResizeEnd);
+  };
+  const handlePanelVResizeStart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    vResizeStateRef.current = { startY: e.clientY, origHeight: sliderAreaHeight };
+    window.addEventListener('mousemove', handlePanelVResizeMove);
+    window.addEventListener('mouseup', handlePanelVResizeEnd);
   };
 
   const activeAngles = activeTab === 'alpha' ? anglesAlpha : anglesBeta;
@@ -183,6 +217,13 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
         onMouseDown={handlePanelResizeStart}
         title="드래그해서 패널 폭 조절"
         className="absolute top-0 right-0 h-full w-2 cursor-ew-resize hover:bg-[#3B82F6]/30 rounded-r-xl"
+      />
+
+      {/* Resize handle — drag to change the slider list's height */}
+      <div
+        onMouseDown={handlePanelVResizeStart}
+        title="드래그해서 슬라이더 목록 세로 크기 조절"
+        className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-[#3B82F6]/30 rounded-b-xl"
       />
 
       {/* Title (drag handle — drag to move the panel) */}
@@ -335,7 +376,10 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
       </div>
 
       {/* Sliders */}
-      <div className="space-y-2 text-xs max-h-80 overflow-y-auto pr-1 font-mono">
+      <div
+        className="space-y-2 text-xs overflow-y-auto pr-1 font-mono"
+        style={{ maxHeight: sliderAreaHeight }}
+      >
         {/* Shoulder Pitch */}
         <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
           <div className="flex justify-between text-[#888] mb-1 text-[11px]">
