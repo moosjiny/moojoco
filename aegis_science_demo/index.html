@@ -207,6 +207,7 @@
 
       <div class="nav-tabs">
         <button class="tab-btn active" onclick="switchTab('live-3d-engine')">⚡ 실시간 3D 코드 구동엔진</button>
+        <button class="tab-btn" onclick="switchTab('hunyuan3d-turntable')">📦 Hunyuan3D 턴테이블 GIF</button>
         <button class="tab-btn" onclick="switchTab('tcp-axes-gif')">🔴🟢 툴좌표계 전후 비교 GIF</button>
         <button class="tab-btn" onclick="switchTab('true-3d-mesh')">🛡️ MuJoCo 3D 물리 메쉬</button>
       </div>
@@ -240,14 +241,28 @@
       </div>
     </div>
 
-    <!-- TAB 2: TCP Axes Before vs After Labeled GIF -->
+    <!-- TAB 2: HUNYUAN3D-2 3D SHAPE TURNTABLE GIF & 4-ANGLE GRID -->
+    <div id="tab-hunyuan3d-turntable" class="tab-content">
+      <div class="media-card" style="padding:20px; display:flex; flex-direction:column; gap:20px;">
+        <div>
+          <h3 style="color:var(--accent-cyan); margin-bottom:10px;">📦 Hunyuan3D-2 50초 생성 8방향 3D 턴테이블 GIF (284,444면 GLB)</h3>
+          <img src="https://images.hyperbook.com/moojoco_hunyuan3d_shape_only_turntable-2026-08-11.gif?v=20260811_v1" alt="Hunyuan3D-2 8방향 턴테이블 GIF">
+        </div>
+        <div style="border-top:1px solid var(--panel-border); padding-top:16px;">
+          <h3 style="color:var(--accent-green); margin-bottom:10px;">📷 Hunyuan3D-2 4방향 정지 렌더 그리드 (hb5u pyrender EGL 오프스크린)</h3>
+          <img src="https://images.hyperbook.com/moojoco_hunyuan3d_shape_only_4angle_grid-2026-08-11.png?v=20260811_v1" alt="Hunyuan3D-2 4방향 정지 그리드">
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: TCP Axes Before vs After Labeled GIF -->
     <div id="tab-tcp-axes-gif" class="tab-content">
       <div class="media-card">
         <img src="https://images.hyperbook.com/handshake_tcp_kinematic_before_after.gif?v=20260806_tcp_v7" alt="툴좌표계 TCP Axes 수정 전후 라벨링 GIF">
       </div>
     </div>
 
-    <!-- TAB 3: MuJoCo True 3D Physics Mesh Render -->
+    <!-- TAB 4: MuJoCo True 3D Physics Mesh Render -->
     <div id="tab-true-3d-mesh" class="tab-content">
       <div class="media-card">
         <img src="https://images.hyperbook.com/true_3d_mesh_handshake_coordinate_render.png?v=20260806_true3d_v7" alt="MuJoCo True 3D Physics Mesh Render">
