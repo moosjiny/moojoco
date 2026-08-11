@@ -18,7 +18,207 @@ interface RobotSceneProps {
   manualAnglesAlpha: JointAngles;
   manualAnglesBeta: JointAngles;
   groundLock: boolean;
+  showComOverlay: boolean;
   onTelemetryUpdate: (data: TelemetryData) => void;
+}
+
+// --- Stage 1 contact-dynamics approximation (see thesis
+// 2026-08-11-moojoco-contact-dynamics-plan): mass-weighted center of mass
+// vs. the support polygon formed by both feet's ground contact points.
+// Approximate whole-body segment mass fractions (sum to 1.0) — not measured,
+// just plausible round numbers as declared in the plan thesis.
+const SEGMENT_MASS_FRACTIONS = {
+  head: 0.07,
+  torso: 0.4,
+  leftArm: 0.08,
+  rightArm: 0.08,
+  leftLeg: 0.185,
+  rightLeg: 0.185,
+};
+
+function avgWorldPosition(...groups: THREE.Object3D[]): THREE.Vector3 {
+  const sum = new THREE.Vector3();
+  const p = new THREE.Vector3();
+  groups.forEach((g) => {
+    g.getWorldPosition(p);
+    sum.add(p);
+  });
+  return sum.divideScalar(groups.length);
+}
+
+function computeCenterOfMass(robot: RobotJointRefs): THREE.Vector3 {
+  const headPos = new THREE.Vector3();
+  robot.head.getWorldPosition(headPos);
+  const torsoPos = new THREE.Vector3();
+  robot.torso.getWorldPosition(torsoPos);
+  const leftArmPos = avgWorldPosition(robot.leftShoulder, robot.leftElbow);
+  const rightArmPos = avgWorldPosition(robot.rightShoulder, robot.rightElbow, robot.rightWrist);
+  const leftLegPos = avgWorldPosition(robot.leftHip, robot.leftKnee, robot.leftAnkle);
+  const rightLegPos = avgWorldPosition(robot.rightHip, robot.rightKnee, robot.rightAnkle);
+
+  const com = new THREE.Vector3();
+  com.addScaledVector(headPos, SEGMENT_MASS_FRACTIONS.head);
+  com.addScaledVector(torsoPos, SEGMENT_MASS_FRACTIONS.torso);
+  com.addScaledVector(leftArmPos, SEGMENT_MASS_FRACTIONS.leftArm);
+  com.addScaledVector(rightArmPos, SEGMENT_MASS_FRACTIONS.rightArm);
+  com.addScaledVector(leftLegPos, SEGMENT_MASS_FRACTIONS.leftLeg);
+  com.addScaledVector(rightLegPos, SEGMENT_MASS_FRACTIONS.rightLeg);
+  return com;
+}
+
+// Same sole-corner derivation as the Ground Lock feature: footMesh is a
+// child of the ankle group at local (0, -0.04, 0.05) with box size
+// (0.14, 0.09, 0.28) — see RobotBuilder.ts createLeg().
+function getFootWorldCorners(ankle: THREE.Group): THREE.Vector3[] {
+  const halfW = 0.07;
+  const soleY = -0.085;
+  const halfD = 0.14;
+  const centerZ = 0.05;
+  return [
+    new THREE.Vector3(-halfW, soleY, centerZ - halfD),
+    new THREE.Vector3(halfW, soleY, centerZ - halfD),
+    new THREE.Vector3(halfW, soleY, centerZ + halfD),
+    new THREE.Vector3(-halfW, soleY, centerZ + halfD),
+  ].map((v) => ankle.localToWorld(v));
+}
+
+interface Point2D {
+  x: number;
+  z: number;
+}
+
+// Andrew's monotone chain — the general solution for "support polygon from N
+// foot contact points," not just today's symmetric two-rectangle case, so it
+// stays correct once asymmetric leg poses are added.
+function convexHull2D(input: Point2D[]): Point2D[] {
+  const pts = [...input].sort((a, b) => (a.x === b.x ? a.z - b.z : a.x - b.x));
+  const cross = (o: Point2D, a: Point2D, b: Point2D) =>
+    (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x);
+
+  const lower: Point2D[] = [];
+  for (const p of pts) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+  const upper: Point2D[] = [];
+  for (let i = pts.length - 1; i >= 0; i--) {
+    const p = pts[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+  upper.pop();
+  lower.pop();
+  return lower.concat(upper);
+}
+
+function pointInPolygon2D(x: number, z: number, poly: Point2D[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const { x: xi, z: zi } = poly[i];
+    const { x: xj, z: zj } = poly[j];
+    const intersects = zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function distanceToPolygonBoundary2D(x: number, z: number, poly: Point2D[]): number {
+  let minDist = Infinity;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[j];
+    const b = poly[i];
+    const abx = b.x - a.x;
+    const abz = b.z - a.z;
+    const lenSq = abx * abx + abz * abz;
+    let t = lenSq === 0 ? 0 : ((x - a.x) * abx + (z - a.z) * abz) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const px = a.x + t * abx;
+    const pz = a.z + t * abz;
+    const dx = x - px;
+    const dz = z - pz;
+    minDist = Math.min(minDist, Math.sqrt(dx * dx + dz * dz));
+  }
+  return minDist;
+}
+
+interface BalanceOverlay {
+  group: THREE.Group;
+  polyLine: THREE.LineLoop;
+  fillMesh: THREE.Mesh;
+  comMarker: THREE.Mesh;
+}
+
+function createBalanceOverlay(): BalanceOverlay {
+  const group = new THREE.Group();
+
+  const lineGeo = new THREE.BufferGeometry();
+  lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(8 * 3), 3));
+  const polyLine = new THREE.LineLoop(
+    lineGeo,
+    new THREE.LineBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.85 })
+  );
+  group.add(polyLine);
+
+  const fillMesh = new THREE.Mesh(
+    new THREE.BufferGeometry(),
+    new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.12, side: THREE.DoubleSide })
+  );
+  group.add(fillMesh);
+
+  const comMarker = new THREE.Mesh(
+    new THREE.SphereGeometry(0.025, 12, 12),
+    new THREE.MeshBasicMaterial({ color: 0x34d399 })
+  );
+  group.add(comMarker);
+
+  group.visible = false;
+  return { group, polyLine, fillMesh, comMarker };
+}
+
+// Recomputes the support polygon + CoM for one robot and updates its overlay
+// meshes in place. Returns the static-stability verdict for telemetry.
+function updateBalanceOverlay(
+  robot: RobotJointRefs,
+  overlay: BalanceOverlay
+): { stable: boolean; marginMm: number } {
+  const corners = [...getFootWorldCorners(robot.leftAnkle), ...getFootWorldCorners(robot.rightAnkle)];
+  const hull = convexHull2D(corners.map((c) => ({ x: c.x, z: c.z })));
+
+  if (hull.length < 3) {
+    overlay.group.visible = false;
+    return { stable: true, marginMm: 0 };
+  }
+  overlay.group.visible = true;
+
+  const posAttr = overlay.polyLine.geometry.attributes.position as THREE.BufferAttribute;
+  hull.forEach((p, i) => posAttr.setXYZ(i, p.x, 0.003, p.z));
+  posAttr.needsUpdate = true;
+  overlay.polyLine.geometry.setDrawRange(0, hull.length);
+
+  // Fan-triangulate the convex hull directly in world XZ coordinates (no
+  // local-shape rotation needed, sidestepping any orientation sign errors).
+  const fillPositions: number[] = [];
+  for (let i = 1; i < hull.length - 1; i++) {
+    fillPositions.push(hull[0].x, 0.002, hull[0].z);
+    fillPositions.push(hull[i].x, 0.002, hull[i].z);
+    fillPositions.push(hull[i + 1].x, 0.002, hull[i + 1].z);
+  }
+  overlay.fillMesh.geometry.dispose();
+  overlay.fillMesh.geometry = new THREE.BufferGeometry();
+  overlay.fillMesh.geometry.setAttribute('position', new THREE.Float32BufferAttribute(fillPositions, 3));
+
+  const com = computeCenterOfMass(robot);
+  const inside = pointInPolygon2D(com.x, com.z, hull);
+  const marginM = distanceToPolygonBoundary2D(com.x, com.z, hull) * (inside ? 1 : -1);
+
+  overlay.comMarker.position.set(com.x, 0.02, com.z);
+  (overlay.comMarker.material as THREE.MeshBasicMaterial).color.setHex(inside ? 0x34d399 : 0xf87171);
+
+  return { stable: inside, marginMm: Math.round(marginM * 1000) };
 }
 
 export const RobotScene: React.FC<RobotSceneProps> = ({
@@ -34,6 +234,7 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
   manualAnglesAlpha,
   manualAnglesBeta,
   groundLock,
+  showComOverlay,
   onTelemetryUpdate,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -49,6 +250,9 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
   const axesHelpersRef = useRef<THREE.Group | null>(null);
   const particlesRef = useRef<THREE.Points | null>(null);
   const particleGeoRef = useRef<THREE.BufferGeometry | null>(null);
+
+  const balanceOverlayAlphaRef = useRef<BalanceOverlay | null>(null);
+  const balanceOverlayBetaRef = useRef<BalanceOverlay | null>(null);
 
   const timeRef = useRef<number>(0);
   const frameIdRef = useRef<number>(0);
@@ -188,6 +392,14 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
     axesGroup.visible = showAxes;
     scene.add(axesGroup);
     axesHelpersRef.current = axesGroup;
+
+    // 9b. Balance Overlay (Stage 1 contact-dynamics: CoM + support polygon)
+    const balanceOverlayAlpha = createBalanceOverlay();
+    const balanceOverlayBeta = createBalanceOverlay();
+    scene.add(balanceOverlayAlpha.group);
+    scene.add(balanceOverlayBeta.group);
+    balanceOverlayAlphaRef.current = balanceOverlayAlpha;
+    balanceOverlayBetaRef.current = balanceOverlayBeta;
 
     // 10. Instantiate Robots Alpha and Beta
     const robotAlpha = buildBipedalRobot('alpha', theme);
@@ -741,6 +953,24 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
           posAttr.needsUpdate = true;
         }
 
+        // Update Balance Overlay (Stage 1 contact-dynamics: CoM + support polygon)
+        let comStabilityAlphaVal: 'STABLE' | 'UNSTABLE' | undefined;
+        let comStabilityBetaVal: 'STABLE' | 'UNSTABLE' | undefined;
+        let comMarginAlphaMmVal: number | undefined;
+        let comMarginBetaMmVal: number | undefined;
+
+        if (showComOverlay && balanceOverlayAlphaRef.current && balanceOverlayBetaRef.current) {
+          const alphaBalance = updateBalanceOverlay(alpha, balanceOverlayAlphaRef.current);
+          const betaBalance = updateBalanceOverlay(beta, balanceOverlayBetaRef.current);
+          comStabilityAlphaVal = alphaBalance.stable ? 'STABLE' : 'UNSTABLE';
+          comStabilityBetaVal = betaBalance.stable ? 'STABLE' : 'UNSTABLE';
+          comMarginAlphaMmVal = alphaBalance.marginMm;
+          comMarginBetaMmVal = betaBalance.marginMm;
+        } else {
+          if (balanceOverlayAlphaRef.current) balanceOverlayAlphaRef.current.group.visible = false;
+          if (balanceOverlayBetaRef.current) balanceOverlayBetaRef.current.group.visible = false;
+        }
+
         // Emit Telemetry Data
         onTelemetryUpdate({
           contactDistance: contactDistMM,
@@ -757,6 +987,10 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
           rlReward: rlRewardVal,
           rlPolicyStatus: rlStatusVal,
           palmAlignmentError: palmErrorVal,
+          comStabilityAlpha: comStabilityAlphaVal,
+          comStabilityBeta: comStabilityBetaVal,
+          comMarginAlphaMm: comMarginAlphaMmVal,
+          comMarginBetaMm: comMarginBetaMmVal,
         });
       }
 
@@ -771,7 +1005,7 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
     return () => {
       if (frameIdRef.current) cancelAnimationFrame(frameIdRef.current);
     };
-  }, [isPlaying, speed, mode, manualAnglesAlpha, manualAnglesBeta, groundLock]);
+  }, [isPlaying, speed, mode, manualAnglesAlpha, manualAnglesBeta, groundLock, showComOverlay]);
 
   return (
     <div className="relative w-full h-full min-h-[400px] overflow-hidden bg-slate-950">

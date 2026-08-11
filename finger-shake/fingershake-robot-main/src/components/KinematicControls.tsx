@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DEFAULT_JOINT_ANGLES, JointAngles } from '../types';
-import { Sliders, RotateCcw, Bot, Save, FolderOpen, Footprints } from 'lucide-react';
+import { Sliders, RotateCcw, Bot, Save, FolderOpen, Footprints, Scale } from 'lucide-react';
 import { soundEngine } from '../utils/audio';
 
 const MANUAL_POSE_STORAGE_KEY = 'fingershake_manual_pose_v1';
@@ -12,6 +12,8 @@ interface KinematicControlsProps {
   setAnglesBeta: React.Dispatch<React.SetStateAction<JointAngles>>;
   groundLock: boolean;
   setGroundLock: React.Dispatch<React.SetStateAction<boolean>>;
+  showComOverlay: boolean;
+  setShowComOverlay: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export const KinematicControls: React.FC<KinematicControlsProps> = ({
@@ -21,6 +23,8 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
   setAnglesBeta,
   groundLock,
   setGroundLock,
+  showComOverlay,
+  setShowComOverlay,
 }) => {
   const [activeTab, setActiveTab] = useState<'alpha' | 'beta'>('alpha');
   const [saveStatus, setSaveStatus] = useState<string>('');
@@ -120,12 +124,32 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
           >
             <Footprints className="w-3.5 h-3.5" />
           </button>
+          <button
+            onClick={() => {
+              setShowComOverlay((prev) => !prev);
+              soundEngine.playClick(showComOverlay ? 500 : 900);
+            }}
+            className={`p-1 rounded border transition-colors ${
+              showComOverlay
+                ? 'bg-[#1E2A0F] border-[#a3e635] text-[#a3e635]'
+                : 'bg-[#111113] border-[#222226] text-[#666] hover:text-[#a3e635]'
+            }`}
+            title="무게중심/지지 다각형 표시 — 각 로봇의 질량 가중 무게중심과 두 발이 만드는 지지 다각형을 바닥에 표시하고, 무게중심이 다각형 밖으로 나가면 정적으로 불안정한 자세로 판정 (Stage 1 접촉 동역학 근사)"
+          >
+            <Scale className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
       {groundLock && (
         <div className="text-[10px] text-center text-[#34d399] font-mono -mt-1">
           🦶 지면 고정 ON — 다리 각도와 무관하게 발이 바닥에 고정됨
+        </div>
+      )}
+
+      {showComOverlay && (
+        <div className="text-[10px] text-center text-[#a3e635] font-mono -mt-1">
+          ⚖️ 무게중심 표시 ON — 초록 다각형 안=안정, 구슬이 빨간색=불안정
         </div>
       )}
 

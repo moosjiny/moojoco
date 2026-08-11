@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TelemetryData } from '../types';
-import { Activity, ShieldCheck, Cpu, Move, ChevronDown, ChevronUp, Brain, Target } from 'lucide-react';
+import { Activity, ShieldCheck, Cpu, Move, ChevronDown, ChevronUp, Brain, Target, Scale } from 'lucide-react';
 
 interface TelemetryPanelProps {
   data: TelemetryData;
@@ -113,6 +113,35 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({ data }) => {
               </div>
             )}
           </div>
+
+          {/* Static Stability (Stage 1 contact-dynamics: CoM vs support polygon) */}
+          {data.comStabilityAlpha !== undefined && (
+            <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A] space-y-1 font-mono">
+              <div className="flex items-center gap-1 text-[10px] text-[#666] uppercase font-bold">
+                <Scale className="w-3 h-3 text-[#a3e635]" /> Static Balance (CoM vs Support Polygon)
+              </div>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-[#888]">Alpha</span>
+                <span
+                  className={`font-bold ${
+                    data.comStabilityAlpha === 'STABLE' ? 'text-[#34d399]' : 'text-[#f87171]'
+                  }`}
+                >
+                  {data.comStabilityAlpha} ({data.comMarginAlphaMm}mm)
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-[#888]">Beta</span>
+                <span
+                  className={`font-bold ${
+                    data.comStabilityBeta === 'STABLE' ? 'text-[#34d399]' : 'text-[#f87171]'
+                  }`}
+                >
+                  {data.comStabilityBeta} ({data.comMarginBetaMm}mm)
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Engine Status & FPS */}
           <div className="flex items-center justify-between pt-1 border-t border-[#1A1A1A] text-[10px] font-mono text-[#666]">

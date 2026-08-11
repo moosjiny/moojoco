@@ -74,6 +74,14 @@ export interface TelemetryData {
   rlPolicyStatus?: string;
   rlLoss?: number;
   palmAlignmentError?: number; // mm
+  // Static stability (Stage 1 of the contact-dynamics plan): whether each
+  // robot's mass-weighted center of mass projects inside its support
+  // polygon (the convex hull of both feet's ground contact points), and by
+  // how much (positive = inside, margin to nearest edge; negative = outside).
+  comStabilityAlpha?: 'STABLE' | 'UNSTABLE';
+  comStabilityBeta?: 'STABLE' | 'UNSTABLE';
+  comMarginAlphaMm?: number;
+  comMarginBetaMm?: number;
 }
 
 export interface RobotConfig {

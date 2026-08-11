@@ -54,6 +54,11 @@ export default function App() {
   // ankle sliders change (manual mode only; see RobotScene.tsx applyGroundLock).
   const [groundLock, setGroundLock] = useState<boolean>(false);
 
+  // Balance overlay — Stage 1 of the contact-dynamics plan (see thesis
+  // 2026-08-11-moojoco-contact-dynamics-plan): shows the mass-weighted center
+  // of mass and support polygon, and whether the pose is statically stable.
+  const [showComOverlay, setShowComOverlay] = useState<boolean>(false);
+
   const [telemetry, setTelemetry] = useState<TelemetryData>({
     contactDistance: 12,
     gripForce: 65,
@@ -98,6 +103,7 @@ export default function App() {
           manualAnglesAlpha={manualAnglesAlpha}
           manualAnglesBeta={manualAnglesBeta}
           groundLock={groundLock}
+          showComOverlay={showComOverlay}
           onTelemetryUpdate={setTelemetry}
         />
       </main>
@@ -114,6 +120,8 @@ export default function App() {
           setAnglesBeta={setManualAnglesBeta}
           groundLock={groundLock}
           setGroundLock={setGroundLock}
+          showComOverlay={showComOverlay}
+          setShowComOverlay={setShowComOverlay}
         />
       )}
 
