@@ -195,11 +195,24 @@ def fetch_papers():
     if now - _papers_cache["ts"] < CACHE_TTL and _papers_cache["data"]:
         return _papers_cache["data"]
     try:
-        r = requests.get(THESIS_API,
-                         headers={"Authorization": f"Bearer {THESIS_TOKEN}"},
-                         timeout=8)
-        raw = r.json()
-        papers = raw.get("papers", raw) if isinstance(raw, dict) else raw
+        papers = []
+        page = 1
+        while True:
+            r = requests.get(THESIS_API,
+                             headers={"Authorization": f"Bearer {THESIS_TOKEN}"},
+                             params={"per_page": 100, "page": page},
+                             timeout=8)
+            raw = r.json()
+            batch = raw.get("papers", raw) if isinstance(raw, dict) else raw
+            if not batch:
+                break
+            papers.extend(batch)
+            total = raw.get("total") if isinstance(raw, dict) else None
+            if total is not None and len(papers) >= total:
+                break
+            if len(batch) < 100:
+                break
+            page += 1
         new_papers = [p for p in papers if p.get("tags")]
         new_count  = len(new_papers)
         old_count  = _papers_cache["count"]
@@ -1030,7 +1043,7 @@ const LEGEND_SKIP = new Set(['eос']);  // 'eos' 오타 허용용 키(키릴 о
 
 function buildGraph(data) {
   const { nodes, edges, type } = data;
-  const scale = 3.5;
+  const scale = 6.0;
   const isNetwork = (type === 'network');
 
   // 엣지 (LineSegments — vertexColors로 per-edge 색상 제어)

@@ -1,0 +1,6 @@
+{
+  "name": "이족보행 로봇 악수 시뮬레이션",
+  "description": "양팔과 두 다리가 있는 이족보행 로봇 두 대가 오른손으로 악수하는 3D 인터랙티브 시뮬레이션",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

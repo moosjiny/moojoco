@@ -10,3 +10,6 @@ __pycache__/
 scratch/ik_debug_log.csv
 cpp_hand_engine/build/
 *.key
+node_modules/
+dist/
+*.zip
