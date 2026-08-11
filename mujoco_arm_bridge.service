@@ -1,0 +1,14 @@
+[Unit]
+Description=Moojoco MuJoCo Arm Bridge (WebSocket PD control + state stream, port 8765)
+After=network.target
+
+[Service]
+Type=simple
+User=moos
+WorkingDirectory=/home/moos/dev_ws/dual_arms
+ExecStart=/home/moos/venv/dual_arms/bin/python3 scripts/mujoco_bridge_server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
