@@ -134,7 +134,7 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
                 ? 'bg-[#1E2A0F] border-[#a3e635] text-[#a3e635]'
                 : 'bg-[#111113] border-[#222226] text-[#666] hover:text-[#a3e635]'
             }`}
-            title="무게중심/지지 다각형 표시 — 각 로봇의 질량 가중 무게중심과 두 발이 만드는 지지 다각형을 바닥에 표시하고, 무게중심이 다각형 밖으로 나가면 정적으로 불안정한 자세로 판정 (Stage 1 접촉 동역학 근사)"
+            title="무게중심/지지 다각형/ZMP 표시 — 무게중심(CoM)·지지 다각형에 더해, CoM 가속도로 구한 ZMP(파란/노랑/빨강 고리)와 마찰원뿔 초과 여부(미끄러짐 위험)까지 판정 (Stage 1+2 접촉 동역학 근사)"
           >
             <Scale className="w-3.5 h-3.5" />
           </button>
@@ -149,7 +149,7 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
 
       {showComOverlay && (
         <div className="text-[10px] text-center text-[#a3e635] font-mono -mt-1">
-          ⚖️ 무게중심 표시 ON — 초록 다각형 안=안정, 구슬이 빨간색=불안정
+          ⚖️ 무게중심/ZMP 표시 ON — 구슬(CoM) 빨강=정적 불안정, 고리(ZMP) 노랑=미끄러짐 위험/빨강=동적 불안정
         </div>
       )}
 

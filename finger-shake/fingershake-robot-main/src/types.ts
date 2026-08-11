@@ -82,6 +82,17 @@ export interface TelemetryData {
   comStabilityBeta?: 'STABLE' | 'UNSTABLE';
   comMarginAlphaMm?: number;
   comMarginBetaMm?: number;
+  // Dynamic stability (Stage 2): a simplified linear-inverted-pendulum ZMP
+  // derived from CoM acceleration (smoothed), plus a friction-cone heuristic
+  // (ratio of horizontal to vertical acceleration vs. an assumed coefficient)
+  // flagging when the pose is changing fast enough that the feet would
+  // plausibly slip. See thesis 2026-08-11-moojoco-contact-dynamics-plan.
+  zmpStabilityAlpha?: 'STABLE' | 'UNSTABLE';
+  zmpStabilityBeta?: 'STABLE' | 'UNSTABLE';
+  zmpMarginAlphaMm?: number;
+  zmpMarginBetaMm?: number;
+  slipRiskAlpha?: boolean;
+  slipRiskBeta?: boolean;
 }
 
 export interface RobotConfig {

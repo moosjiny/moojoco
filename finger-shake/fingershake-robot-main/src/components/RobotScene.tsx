@@ -145,11 +145,87 @@ function distanceToPolygonBoundary2D(x: number, z: number, poly: Point2D[]): num
   return minDist;
 }
 
+// --- Stage 2 (see thesis 2026-08-11-moojoco-contact-dynamics-plan): dynamic
+// ZMP from CoM acceleration (simplified linear-inverted-pendulum formula),
+// plus a friction-cone heuristic. Neither requires the segment's absolute
+// mass — the friction check is a ratio of horizontal to vertical force
+// (m·a_horizontal / m·g), so mass cancels out.
+const GRAVITY = 9.81;
+const FRICTION_COEFFICIENT = 0.6; // concrete-on-rubber approximation, declared in the plan thesis
+const COM_SMOOTHING = 0.25; // EMA factor on velocity/acceleration — raw frame-to-frame
+// differencing of a slider-driven (not physically continuous) CoM position produces huge
+// single-frame spikes; smoothing keeps the ZMP/slip readout legible instead of flickering.
+
+interface ComHistory {
+  hasPrev: boolean;
+  posX: number;
+  posZ: number;
+  velX: number;
+  velZ: number;
+  accelX: number;
+  accelZ: number;
+  lastTime: number | null;
+}
+
+function createComHistory(): ComHistory {
+  return { hasPrev: false, posX: 0, posZ: 0, velX: 0, velZ: 0, accelX: 0, accelZ: 0, lastTime: null };
+}
+
+function updateDynamicStability(
+  comX: number,
+  comZ: number,
+  comHeight: number,
+  hull: Point2D[],
+  history: ComHistory
+): { zmpX: number; zmpZ: number; zmpStable: boolean; zmpMarginMm: number; slipRisk: boolean } {
+  const now = performance.now();
+  let dt = history.lastTime !== null ? (now - history.lastTime) / 1000 : null;
+  if (dt !== null) dt = Math.min(dt, 0.2); // clamp so a long pause (tab hidden, etc.) doesn't spike
+  history.lastTime = now;
+
+  if (!history.hasPrev || dt === null || dt <= 0) {
+    history.hasPrev = true;
+    history.posX = comX;
+    history.posZ = comZ;
+    history.velX = 0;
+    history.velZ = 0;
+    history.accelX = 0;
+    history.accelZ = 0;
+    const inside = pointInPolygon2D(comX, comZ, hull);
+    const marginM = distanceToPolygonBoundary2D(comX, comZ, hull) * (inside ? 1 : -1);
+    return { zmpX: comX, zmpZ: comZ, zmpStable: inside, zmpMarginMm: Math.round(marginM * 1000), slipRisk: false };
+  }
+
+  const rawVelX = (comX - history.posX) / dt;
+  const rawVelZ = (comZ - history.posZ) / dt;
+  const rawAccelX = (rawVelX - history.velX) / dt;
+  const rawAccelZ = (rawVelZ - history.velZ) / dt;
+
+  history.velX += (rawVelX - history.velX) * COM_SMOOTHING;
+  history.velZ += (rawVelZ - history.velZ) * COM_SMOOTHING;
+  history.accelX += (rawAccelX - history.accelX) * COM_SMOOTHING;
+  history.accelZ += (rawAccelZ - history.accelZ) * COM_SMOOTHING;
+  history.posX = comX;
+  history.posZ = comZ;
+
+  // Simplified linear inverted-pendulum ZMP: ZMP = CoM - (height/g) * CoM_accel
+  const zmpX = comX - (comHeight / GRAVITY) * history.accelX;
+  const zmpZ = comZ - (comHeight / GRAVITY) * history.accelZ;
+  const inside = pointInPolygon2D(zmpX, zmpZ, hull);
+  const marginM = distanceToPolygonBoundary2D(zmpX, zmpZ, hull) * (inside ? 1 : -1);
+
+  const aHoriz = Math.sqrt(history.accelX ** 2 + history.accelZ ** 2);
+  const slipRisk = aHoriz / GRAVITY > FRICTION_COEFFICIENT;
+
+  return { zmpX, zmpZ, zmpStable: inside, zmpMarginMm: Math.round(marginM * 1000), slipRisk };
+}
+
 interface BalanceOverlay {
   group: THREE.Group;
   polyLine: THREE.LineLoop;
   fillMesh: THREE.Mesh;
   comMarker: THREE.Mesh;
+  zmpMarker: THREE.Mesh;
 }
 
 function createBalanceOverlay(): BalanceOverlay {
@@ -175,22 +251,39 @@ function createBalanceOverlay(): BalanceOverlay {
   );
   group.add(comMarker);
 
+  // ZMP marker — a flat ring so it reads as visually distinct from the CoM
+  // sphere even when the robot is static and the two points coincide.
+  const zmpMarker = new THREE.Mesh(
+    new THREE.RingGeometry(0.02, 0.032, 20),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide })
+  );
+  zmpMarker.rotation.x = -Math.PI / 2;
+  group.add(zmpMarker);
+
   group.visible = false;
-  return { group, polyLine, fillMesh, comMarker };
+  return { group, polyLine, fillMesh, comMarker, zmpMarker };
 }
 
 // Recomputes the support polygon + CoM for one robot and updates its overlay
-// meshes in place. Returns the static-stability verdict for telemetry.
+// meshes in place. Returns the static (CoM) and dynamic (ZMP/friction)
+// stability verdicts for telemetry.
 function updateBalanceOverlay(
   robot: RobotJointRefs,
-  overlay: BalanceOverlay
-): { stable: boolean; marginMm: number } {
+  overlay: BalanceOverlay,
+  history: ComHistory
+): {
+  stable: boolean;
+  marginMm: number;
+  zmpStable: boolean;
+  zmpMarginMm: number;
+  slipRisk: boolean;
+} {
   const corners = [...getFootWorldCorners(robot.leftAnkle), ...getFootWorldCorners(robot.rightAnkle)];
   const hull = convexHull2D(corners.map((c) => ({ x: c.x, z: c.z })));
 
   if (hull.length < 3) {
     overlay.group.visible = false;
-    return { stable: true, marginMm: 0 };
+    return { stable: true, marginMm: 0, zmpStable: true, zmpMarginMm: 0, slipRisk: false };
   }
   overlay.group.visible = true;
 
@@ -218,7 +311,19 @@ function updateBalanceOverlay(
   overlay.comMarker.position.set(com.x, 0.02, com.z);
   (overlay.comMarker.material as THREE.MeshBasicMaterial).color.setHex(inside ? 0x34d399 : 0xf87171);
 
-  return { stable: inside, marginMm: Math.round(marginM * 1000) };
+  const dynamic = updateDynamicStability(com.x, com.z, com.y, hull, history);
+  overlay.zmpMarker.position.set(dynamic.zmpX, 0.028, dynamic.zmpZ);
+  (overlay.zmpMarker.material as THREE.MeshBasicMaterial).color.setHex(
+    !dynamic.zmpStable ? 0xf87171 : dynamic.slipRisk ? 0xf59e0b : 0x38bdf8
+  );
+
+  return {
+    stable: inside,
+    marginMm: Math.round(marginM * 1000),
+    zmpStable: dynamic.zmpStable,
+    zmpMarginMm: dynamic.zmpMarginMm,
+    slipRisk: dynamic.slipRisk,
+  };
 }
 
 export const RobotScene: React.FC<RobotSceneProps> = ({
@@ -253,6 +358,8 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
 
   const balanceOverlayAlphaRef = useRef<BalanceOverlay | null>(null);
   const balanceOverlayBetaRef = useRef<BalanceOverlay | null>(null);
+  const comHistoryAlphaRef = useRef<ComHistory>(createComHistory());
+  const comHistoryBetaRef = useRef<ComHistory>(createComHistory());
 
   const timeRef = useRef<number>(0);
   const frameIdRef = useRef<number>(0);
@@ -953,22 +1060,37 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
           posAttr.needsUpdate = true;
         }
 
-        // Update Balance Overlay (Stage 1 contact-dynamics: CoM + support polygon)
+        // Update Balance Overlay (Stage 1: CoM + support polygon; Stage 2: dynamic
+        // ZMP from CoM acceleration + friction-cone slip-risk heuristic)
         let comStabilityAlphaVal: 'STABLE' | 'UNSTABLE' | undefined;
         let comStabilityBetaVal: 'STABLE' | 'UNSTABLE' | undefined;
         let comMarginAlphaMmVal: number | undefined;
         let comMarginBetaMmVal: number | undefined;
+        let zmpStabilityAlphaVal: 'STABLE' | 'UNSTABLE' | undefined;
+        let zmpStabilityBetaVal: 'STABLE' | 'UNSTABLE' | undefined;
+        let zmpMarginAlphaMmVal: number | undefined;
+        let zmpMarginBetaMmVal: number | undefined;
+        let slipRiskAlphaVal: boolean | undefined;
+        let slipRiskBetaVal: boolean | undefined;
 
         if (showComOverlay && balanceOverlayAlphaRef.current && balanceOverlayBetaRef.current) {
-          const alphaBalance = updateBalanceOverlay(alpha, balanceOverlayAlphaRef.current);
-          const betaBalance = updateBalanceOverlay(beta, balanceOverlayBetaRef.current);
+          const alphaBalance = updateBalanceOverlay(alpha, balanceOverlayAlphaRef.current, comHistoryAlphaRef.current);
+          const betaBalance = updateBalanceOverlay(beta, balanceOverlayBetaRef.current, comHistoryBetaRef.current);
           comStabilityAlphaVal = alphaBalance.stable ? 'STABLE' : 'UNSTABLE';
           comStabilityBetaVal = betaBalance.stable ? 'STABLE' : 'UNSTABLE';
           comMarginAlphaMmVal = alphaBalance.marginMm;
           comMarginBetaMmVal = betaBalance.marginMm;
+          zmpStabilityAlphaVal = alphaBalance.zmpStable ? 'STABLE' : 'UNSTABLE';
+          zmpStabilityBetaVal = betaBalance.zmpStable ? 'STABLE' : 'UNSTABLE';
+          zmpMarginAlphaMmVal = alphaBalance.zmpMarginMm;
+          zmpMarginBetaMmVal = betaBalance.zmpMarginMm;
+          slipRiskAlphaVal = alphaBalance.slipRisk;
+          slipRiskBetaVal = betaBalance.slipRisk;
         } else {
           if (balanceOverlayAlphaRef.current) balanceOverlayAlphaRef.current.group.visible = false;
           if (balanceOverlayBetaRef.current) balanceOverlayBetaRef.current.group.visible = false;
+          comHistoryAlphaRef.current.hasPrev = false;
+          comHistoryBetaRef.current.hasPrev = false;
         }
 
         // Emit Telemetry Data
@@ -991,6 +1113,12 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
           comStabilityBeta: comStabilityBetaVal,
           comMarginAlphaMm: comMarginAlphaMmVal,
           comMarginBetaMm: comMarginBetaMmVal,
+          zmpStabilityAlpha: zmpStabilityAlphaVal,
+          zmpStabilityBeta: zmpStabilityBetaVal,
+          zmpMarginAlphaMm: zmpMarginAlphaMmVal,
+          zmpMarginBetaMm: zmpMarginBetaMmVal,
+          slipRiskAlpha: slipRiskAlphaVal,
+          slipRiskBeta: slipRiskBetaVal,
         });
       }
 

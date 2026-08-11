@@ -1,6 +1,18 @@
 import React, { useState } from 'react';
 import { TelemetryData } from '../types';
-import { Activity, ShieldCheck, Cpu, Move, ChevronDown, ChevronUp, Brain, Target, Scale } from 'lucide-react';
+import {
+  Activity,
+  ShieldCheck,
+  Cpu,
+  Move,
+  ChevronDown,
+  ChevronUp,
+  Brain,
+  Target,
+  Scale,
+  Waves,
+  TriangleAlert,
+} from 'lucide-react';
 
 interface TelemetryPanelProps {
   data: TelemetryData;
@@ -138,6 +150,41 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({ data }) => {
                   }`}
                 >
                   {data.comStabilityBeta} ({data.comMarginBetaMm}mm)
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Dynamic ZMP + Friction Cone (Stage 2 contact-dynamics) */}
+          {data.zmpStabilityAlpha !== undefined && (
+            <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A] space-y-1 font-mono">
+              <div className="flex items-center gap-1 text-[10px] text-[#666] uppercase font-bold">
+                <Waves className="w-3 h-3 text-[#38bdf8]" /> Dynamic ZMP (CoM Accel)
+              </div>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-[#888] flex items-center gap-1">
+                  Alpha
+                  {data.slipRiskAlpha && <TriangleAlert className="w-3 h-3 text-[#f59e0b]" />}
+                </span>
+                <span
+                  className={`font-bold ${
+                    data.zmpStabilityAlpha === 'STABLE' ? 'text-[#38bdf8]' : 'text-[#f87171]'
+                  }`}
+                >
+                  {data.zmpStabilityAlpha} ({data.zmpMarginAlphaMm}mm)
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-[#888] flex items-center gap-1">
+                  Beta
+                  {data.slipRiskBeta && <TriangleAlert className="w-3 h-3 text-[#f59e0b]" />}
+                </span>
+                <span
+                  className={`font-bold ${
+                    data.zmpStabilityBeta === 'STABLE' ? 'text-[#38bdf8]' : 'text-[#f87171]'
+                  }`}
+                >
+                  {data.zmpStabilityBeta} ({data.zmpMarginBetaMm}mm)
                 </span>
               </div>
             </div>
