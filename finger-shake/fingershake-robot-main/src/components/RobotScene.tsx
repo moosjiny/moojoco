@@ -481,31 +481,45 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
           beta.leftShoulder.rotation.z = -manualAnglesBeta.shoulderRoll * degToRad;
           beta.leftElbow.rotation.x = manualAnglesBeta.elbowFlexion * degToRad;
 
-          // Finger clasping in Manual mode
-          // (rotation.x sign negated on the gripFactor term so curling wraps the
-          // fingertips toward the palm/partner side, not the dorsal/back side)
-          const applyDexGrip = (robot: RobotJointRefs, gripFactor: number) => {
+          // Independent finger clasping in Manual mode — each finger gets its own curl
+          // value (thumb, index, middle, ring, pinky, matching rightFingers order) instead
+          // of a single shared gripFactor. (rotation.x sign negated on the curl term so
+          // curling wraps the fingertips toward the palm/partner side, not the dorsal side)
+          const applyDexGrip = (robot: RobotJointRefs, curls: number[]) => {
             robot.rightFingers.forEach((fGroup, i) => {
               const isThumb = i === 0;
+              const curl = curls[i];
               if (isThumb) {
-                fGroup.rotation.x = -0.22 - gripFactor * 0.45;
-                fGroup.rotation.y = Math.PI / 4.2 - gripFactor * 0.35;
+                fGroup.rotation.x = -0.22 - curl * 0.45;
+                fGroup.rotation.y = Math.PI / 4.2 - curl * 0.35;
               } else {
-                fGroup.rotation.x = -gripFactor * 0.85;
+                fGroup.rotation.x = -curl * 0.85;
               }
 
               fGroup.traverse((child) => {
                 if (child.name === 'pip_joint') {
-                  child.rotation.x = -gripFactor * 0.75;
+                  child.rotation.x = -curl * 0.75;
                 } else if (child.name === 'dip_joint') {
-                  child.rotation.x = -gripFactor * 0.6;
+                  child.rotation.x = -curl * 0.6;
                 }
               });
             });
           };
 
-          applyDexGrip(alpha, manualAnglesAlpha.fingerGrip);
-          applyDexGrip(beta, manualAnglesBeta.fingerGrip);
+          applyDexGrip(alpha, [
+            manualAnglesAlpha.thumbCurl,
+            manualAnglesAlpha.indexCurl,
+            manualAnglesAlpha.middleCurl,
+            manualAnglesAlpha.ringCurl,
+            manualAnglesAlpha.pinkyCurl,
+          ]);
+          applyDexGrip(beta, [
+            manualAnglesBeta.thumbCurl,
+            manualAnglesBeta.indexCurl,
+            manualAnglesBeta.middleCurl,
+            manualAnglesBeta.ringCurl,
+            manualAnglesBeta.pinkyCurl,
+          ]);
         } else if (mode === 'highfive') {
           // High-five gesture: Step back, raise hand up, clap, then return
           const cycle = (Math.sin(t * 2.5) + 1) / 2; // 0 to 1

@@ -12,7 +12,13 @@ export interface JointAngles {
   wristPitch: number;
   wristRoll: number;
   wristYaw: number;
-  fingerGrip: number; // 0 to 1
+  // Independent per-finger curl, 0 (open) to 1 (closed). Order matches
+  // RobotBuilder's fingerConfigs / rightFingers array: thumb, index, middle, ring, pinky.
+  thumbCurl: number;
+  indexCurl: number;
+  middleCurl: number;
+  ringCurl: number;
+  pinkyCurl: number;
   torsoPitch: number;
   torsoYaw: number;
   footPitch: number; // ankle dorsiflexion(+)/plantarflexion(-), degrees, applied to both feet
@@ -26,7 +32,11 @@ export const DEFAULT_JOINT_ANGLES: JointAngles = {
   wristPitch: 10,
   wristRoll: 0,
   wristYaw: 0,
-  fingerGrip: 0.8,
+  thumbCurl: 0.8,
+  indexCurl: 0.8,
+  middleCurl: 0.8,
+  ringCurl: 0.8,
+  pinkyCurl: 0.8,
   torsoPitch: 0,
   torsoYaw: -10,
   footPitch: 0,

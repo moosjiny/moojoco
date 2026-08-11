@@ -253,24 +253,34 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
           />
         </div>
 
-        {/* Finger Grip */}
-        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-            <span>Finger Grip</span>
-            <span className="font-mono text-[#F59E0B] font-bold">
-              {Math.round(activeAngles.fingerGrip * 100)}%
-            </span>
+        {/* Independent Finger Curls */}
+        {(
+          [
+            ['thumbCurl', 'Thumb Curl'],
+            ['indexCurl', 'Index Curl'],
+            ['middleCurl', 'Middle Curl'],
+            ['ringCurl', 'Ring Curl'],
+            ['pinkyCurl', 'Pinky Curl'],
+          ] as [keyof JointAngles, string][]
+        ).map(([key, label]) => (
+          <div key={key} className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
+            <div className="flex justify-between text-[#888] mb-1 text-[11px]">
+              <span>{label}</span>
+              <span className="font-mono text-[#F59E0B] font-bold">
+                {Math.round(activeAngles[key] * 100)}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={activeAngles[key]}
+              onChange={(e) => handleChange(key, Number(e.target.value))}
+              className="w-full accent-[#F59E0B] bg-[#222226] rounded h-1 cursor-pointer"
+            />
           </div>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={activeAngles.fingerGrip}
-            onChange={(e) => handleChange('fingerGrip', Number(e.target.value))}
-            className="w-full accent-[#F59E0B] bg-[#222226] rounded h-1 cursor-pointer"
-          />
-        </div>
+        ))}
 
         {/* Torso Yaw */}
         <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
