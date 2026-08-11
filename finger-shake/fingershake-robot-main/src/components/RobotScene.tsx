@@ -458,13 +458,11 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
           alpha.torso.rotation.y = manualAnglesAlpha.torsoYaw * degToRad;
           alpha.leftAnkle.rotation.x = manualAnglesAlpha.footPitch * degToRad;
           alpha.rightAnkle.rotation.x = manualAnglesAlpha.footPitch * degToRad;
-          // Left arm mirrors the right arm's shoulder/elbow sliders (yaw & roll sign-flipped
-          // across the sagittal plane; pitch & elbow flexion stay same-sign since raising/
-          // bending is symmetric between left and right)
-          alpha.leftShoulder.rotation.x = manualAnglesAlpha.shoulderPitch * degToRad;
-          alpha.leftShoulder.rotation.y = -manualAnglesAlpha.shoulderYaw * degToRad;
-          alpha.leftShoulder.rotation.z = -manualAnglesAlpha.shoulderRoll * degToRad;
-          alpha.leftElbow.rotation.x = manualAnglesAlpha.elbowFlexion * degToRad;
+          // Left arm — independent sliders, no longer mirrored from the right arm
+          alpha.leftShoulder.rotation.x = manualAnglesAlpha.leftShoulderPitch * degToRad;
+          alpha.leftShoulder.rotation.y = manualAnglesAlpha.leftShoulderYaw * degToRad;
+          alpha.leftShoulder.rotation.z = manualAnglesAlpha.leftShoulderRoll * degToRad;
+          alpha.leftElbow.rotation.x = manualAnglesAlpha.leftElbowFlexion * degToRad;
 
           beta.rightShoulder.rotation.x = manualAnglesBeta.shoulderPitch * degToRad;
           beta.rightShoulder.rotation.y = manualAnglesBeta.shoulderYaw * degToRad;
@@ -476,10 +474,10 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
           beta.torso.rotation.y = manualAnglesBeta.torsoYaw * degToRad;
           beta.leftAnkle.rotation.x = manualAnglesBeta.footPitch * degToRad;
           beta.rightAnkle.rotation.x = manualAnglesBeta.footPitch * degToRad;
-          beta.leftShoulder.rotation.x = manualAnglesBeta.shoulderPitch * degToRad;
-          beta.leftShoulder.rotation.y = -manualAnglesBeta.shoulderYaw * degToRad;
-          beta.leftShoulder.rotation.z = -manualAnglesBeta.shoulderRoll * degToRad;
-          beta.leftElbow.rotation.x = manualAnglesBeta.elbowFlexion * degToRad;
+          beta.leftShoulder.rotation.x = manualAnglesBeta.leftShoulderPitch * degToRad;
+          beta.leftShoulder.rotation.y = manualAnglesBeta.leftShoulderYaw * degToRad;
+          beta.leftShoulder.rotation.z = manualAnglesBeta.leftShoulderRoll * degToRad;
+          beta.leftElbow.rotation.x = manualAnglesBeta.leftElbowFlexion * degToRad;
 
           // Independent finger clasping in Manual mode — each finger gets its own curl
           // value (thumb, index, middle, ring, pinky, matching rightFingers order) instead

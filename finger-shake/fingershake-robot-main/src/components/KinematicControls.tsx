@@ -313,6 +313,35 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
             className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
           />
         </div>
+
+        {/* Left Arm — independent, not mirrored from the right arm above */}
+        <div className="pt-1 pb-0.5 text-center text-[10px] uppercase tracking-widest text-[#555] font-mono border-t border-[#1A1A1A]">
+          Left Arm (independent)
+        </div>
+
+        {(
+          [
+            ['leftShoulderPitch', 'Left Shoulder Pitch', -120, 30],
+            ['leftShoulderYaw', 'Left Shoulder Yaw', -60, 60],
+            ['leftShoulderRoll', 'Left Shoulder Roll', -180, 180],
+            ['leftElbowFlexion', 'Left Elbow Flexion', 0, 120],
+          ] as [keyof JointAngles, string, number, number][]
+        ).map(([key, label, min, max]) => (
+          <div key={key} className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
+            <div className="flex justify-between text-[#888] mb-1 text-[11px]">
+              <span>{label}</span>
+              <span className="font-mono text-[#3B82F6] font-bold">{activeAngles[key]}°</span>
+            </div>
+            <input
+              type="range"
+              min={min}
+              max={max}
+              value={activeAngles[key]}
+              onChange={(e) => handleChange(key, Number(e.target.value))}
+              className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
