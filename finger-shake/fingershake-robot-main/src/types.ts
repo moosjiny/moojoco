@@ -22,6 +22,8 @@ export interface JointAngles {
   torsoPitch: number;
   torsoYaw: number;
   footPitch: number; // ankle dorsiflexion(+)/plantarflexion(-), degrees, applied to both feet
+  hipFlexion: number; // degrees, applied symmetrically to both hips
+  kneeFlexion: number; // degrees, applied symmetrically to both knees
   // Left arm — independent from the right arm sliders above (no longer mirrored).
   // Left hand/wrist geometry doesn't exist yet (leftHand is a plain box), so there
   // is no left-side wrist/finger control until that geometry is built.
@@ -47,6 +49,8 @@ export const DEFAULT_JOINT_ANGLES: JointAngles = {
   torsoPitch: 0,
   torsoYaw: -10,
   footPitch: 0,
+  hipFlexion: 0,
+  kneeFlexion: 0,
   leftShoulderPitch: -64,
   leftShoulderYaw: 20,
   leftShoulderRoll: 12,
