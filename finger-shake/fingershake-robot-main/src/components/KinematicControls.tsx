@@ -298,6 +298,22 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
           />
         </div>
 
+        {/* Torso Pitch */}
+        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
+          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
+            <span>Torso Pitch</span>
+            <span className="font-mono text-[#3B82F6] font-bold">{activeAngles.torsoPitch}°</span>
+          </div>
+          <input
+            type="range"
+            min="-30"
+            max="30"
+            value={activeAngles.torsoPitch}
+            onChange={(e) => handleChange('torsoPitch', Number(e.target.value))}
+            className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
+          />
+        </div>
+
         {/* Foot Angle (Ankle Pitch, both feet) */}
         <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
           <div className="flex justify-between text-[#888] mb-1 text-[11px]">
