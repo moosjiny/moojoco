@@ -1,0 +1,67 @@
+<mujoco model="biped_balance_test">
+  <compiler angle="radian" />
+  <option timestep="0.002" gravity="0 0 -9.81" />
+
+  <!-- B-5-1 (contact-dynamics roadmap stage 3): unlike dual_openarm_handshake.xml
+       (gravity off, contype/conaffinity 0 everywhere, fixed base — a pure
+       kinematic puppet), this is a real-physics test rig: gravity on, floor +
+       feet have contact enabled, and the pelvis has a free joint so it can
+       genuinely fall over if the legs can't hold it up. Deliberately minimal
+       (primitive geoms, single robot, legs only, sagittal-plane hinges only)
+       to validate the physics before integrating with the existing arm model
+       or the fingershake-robot-main analytic CoM/ZMP overlay. -->
+
+  <default>
+    <joint damping="1.0" frictionloss="0.05" />
+    <geom contype="1" conaffinity="1" friction="0.9 0.01 0.0001" density="1000" />
+  </default>
+
+  <worldbody>
+    <light name="light_top" pos="0 0 3" dir="0 0 -1" diffuse="0.8 0.8 0.8" directional="true" />
+    <light name="light_side" pos="2 -2 2" dir="-1 1 -1" diffuse="0.4 0.4 0.4" directional="true" />
+    <camera name="cam_side" mode="targetbody" target="pelvis" pos="2.2 0 1.0" fovy="55" />
+
+    <geom name="floor" type="plane" size="5 5 0.1" rgba="0.25 0.25 0.28 1" />
+
+    <body name="pelvis" pos="0 0 0.84">
+      <freejoint name="pelvis_free" />
+      <geom name="torso_geom" type="box" size="0.13 0.09 0.18" pos="0 0 0.24" rgba="0.6 0.6 0.65 1" />
+      <geom name="pelvis_geom" type="box" size="0.11 0.08 0.06" rgba="0.5 0.5 0.55 1" />
+
+      <body name="left_hip" pos="0 0.09 0">
+        <joint name="left_hip_pitch" type="hinge" axis="0 1 0" range="-1.396 1.745" />
+        <geom name="left_thigh_geom" type="capsule" fromto="0 0 0 0 0 -0.4" size="0.045" />
+        <body name="left_knee" pos="0 0 -0.4">
+          <joint name="left_knee_pitch" type="hinge" axis="0 1 0" range="0 2.269" />
+          <geom name="left_shank_geom" type="capsule" fromto="0 0 0 0 0 -0.4" size="0.035" />
+          <body name="left_ankle" pos="0 0 -0.4">
+            <joint name="left_ankle_pitch" type="hinge" axis="0 1 0" range="-0.785 0.785" />
+            <geom name="left_foot_geom" type="box" size="0.08 0.04 0.02" pos="0.02 0 -0.02" rgba="0.3 0.3 0.35 1" />
+          </body>
+        </body>
+      </body>
+
+      <body name="right_hip" pos="0 -0.09 0">
+        <joint name="right_hip_pitch" type="hinge" axis="0 1 0" range="-1.396 1.745" />
+        <geom name="right_thigh_geom" type="capsule" fromto="0 0 0 0 0 -0.4" size="0.045" />
+        <body name="right_knee" pos="0 0 -0.4">
+          <joint name="right_knee_pitch" type="hinge" axis="0 1 0" range="0 2.269" />
+          <geom name="right_shank_geom" type="capsule" fromto="0 0 0 0 0 -0.4" size="0.035" />
+          <body name="right_ankle" pos="0 0 -0.4">
+            <joint name="right_ankle_pitch" type="hinge" axis="0 1 0" range="-0.785 0.785" />
+            <geom name="right_foot_geom" type="box" size="0.08 0.04 0.02" pos="0.02 0 -0.02" rgba="0.3 0.3 0.35 1" />
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <general name="left_hip_pitch_ctrl" joint="left_hip_pitch" ctrllimited="true" ctrlrange="-80 80" />
+    <general name="left_knee_pitch_ctrl" joint="left_knee_pitch" ctrllimited="true" ctrlrange="-80 80" />
+    <general name="left_ankle_pitch_ctrl" joint="left_ankle_pitch" ctrllimited="true" ctrlrange="-40 40" />
+    <general name="right_hip_pitch_ctrl" joint="right_hip_pitch" ctrllimited="true" ctrlrange="-80 80" />
+    <general name="right_knee_pitch_ctrl" joint="right_knee_pitch" ctrllimited="true" ctrlrange="-80 80" />
+    <general name="right_ankle_pitch_ctrl" joint="right_ankle_pitch" ctrllimited="true" ctrlrange="-40 40" />
+  </actuator>
+</mujoco>

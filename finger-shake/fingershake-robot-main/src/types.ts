@@ -1,5 +1,9 @@
 export type HandshakeMode = 'standard' | 'energetic' | 'diplomatic' | 'impedance' | 'rl_agent' | 'manual' | 'highfive';
 
+// Connection state for the optional MuJoCo physics bridge (manual mode only,
+// Alpha's right arm only) — see thesis 2026-08-12-moojoco-option-b-stage4-frontend.
+export type MujocoBridgeStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
 export type RobotTheme = 'cyber' | 'stealth' | 'titanium' | 'industrial';
 
 export type CameraPreset = 'default' | 'hands' | 'side' | 'top' | 'robotA' | 'robotB' | 'closeup';

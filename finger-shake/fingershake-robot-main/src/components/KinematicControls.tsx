@@ -1,10 +1,39 @@
-import React, { useState } from 'react';
-import { DEFAULT_JOINT_ANGLES, JointAngles } from '../types';
-import { Sliders, RotateCcw, Bot, Save, FolderOpen, Footprints, Scale } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { DEFAULT_JOINT_ANGLES, JointAngles, MujocoBridgeStatus } from '../types';
+import { Sliders, RotateCcw, Bot, Save, FolderOpen, Footprints, Scale, Cpu, GripHorizontal } from 'lucide-react';
 import { soundEngine } from '../utils/audio';
 
 const MANUAL_POSE_STORAGE_KEY = 'fingershake_manual_pose_v1';
 const MANUAL_POSE_BACKUP_KEY = 'fingershake_manual_pose_v1_backup';
+
+// Panel is draggable/resizable (width only, height stays content-driven with
+// its own internal scroll) because the icon row overflows the old fixed
+// w-80 once enough toggles accumulate. Layout persists across reloads.
+const PANEL_LAYOUT_STORAGE_KEY = 'fingershake_kinematic_panel_layout_v1';
+const PANEL_DEFAULT_WIDTH = 400;
+const PANEL_MIN_WIDTH = 280;
+const PANEL_MAX_WIDTH = 640;
+const PANEL_DEFAULT_TOP = 80; // matches the old top-20 default
+
+interface PanelLayout {
+  x: number;
+  y: number;
+  width: number;
+}
+
+function loadPanelLayout(): PanelLayout | null {
+  try {
+    const raw = localStorage.getItem(PANEL_LAYOUT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number' && typeof parsed?.width === 'number') {
+      return parsed;
+    }
+  } catch {
+    // ignore malformed/blocked storage
+  }
+  return null;
+}
 
 interface KinematicControlsProps {
   anglesAlpha: JointAngles;
@@ -15,6 +44,9 @@ interface KinematicControlsProps {
   setGroundLock: React.Dispatch<React.SetStateAction<boolean>>;
   showComOverlay: boolean;
   setShowComOverlay: React.Dispatch<React.SetStateAction<boolean>>;
+  mujocoLive: boolean;
+  setMujocoLive: React.Dispatch<React.SetStateAction<boolean>>;
+  mujocoStatus: MujocoBridgeStatus;
 }
 
 export const KinematicControls: React.FC<KinematicControlsProps> = ({
@@ -26,9 +58,65 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
   setGroundLock,
   showComOverlay,
   setShowComOverlay,
+  mujocoLive,
+  setMujocoLive,
+  mujocoStatus,
 }) => {
   const [activeTab, setActiveTab] = useState<'alpha' | 'beta'>('alpha');
   const [saveStatus, setSaveStatus] = useState<string>('');
+
+  const [panelPos, setPanelPos] = useState<{ x: number; y: number }>(
+    () => loadPanelLayout() ?? { x: Math.max(8, window.innerWidth - PANEL_DEFAULT_WIDTH - 16), y: PANEL_DEFAULT_TOP }
+  );
+  const [panelWidth, setPanelWidth] = useState<number>(() => loadPanelLayout()?.width ?? PANEL_DEFAULT_WIDTH);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PANEL_LAYOUT_STORAGE_KEY, JSON.stringify({ ...panelPos, width: panelWidth }));
+    } catch {
+      // ignore blocked storage
+    }
+  }, [panelPos, panelWidth]);
+
+  const dragStateRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const resizeStateRef = useRef<{ startX: number; origWidth: number } | null>(null);
+
+  const handlePanelDragMove = (e: MouseEvent) => {
+    const d = dragStateRef.current;
+    if (!d) return;
+    setPanelPos({
+      x: Math.min(Math.max(0, d.origX + (e.clientX - d.startX)), window.innerWidth - 40),
+      y: Math.min(Math.max(0, d.origY + (e.clientY - d.startY)), window.innerHeight - 40),
+    });
+  };
+  const handlePanelDragEnd = () => {
+    dragStateRef.current = null;
+    window.removeEventListener('mousemove', handlePanelDragMove);
+    window.removeEventListener('mouseup', handlePanelDragEnd);
+  };
+  const handlePanelDragStart = (e: React.MouseEvent) => {
+    dragStateRef.current = { startX: e.clientX, startY: e.clientY, origX: panelPos.x, origY: panelPos.y };
+    window.addEventListener('mousemove', handlePanelDragMove);
+    window.addEventListener('mouseup', handlePanelDragEnd);
+  };
+
+  const handlePanelResizeMove = (e: MouseEvent) => {
+    const r = resizeStateRef.current;
+    if (!r) return;
+    const maxWidth = Math.min(PANEL_MAX_WIDTH, window.innerWidth - panelPos.x - 8);
+    setPanelWidth(Math.min(Math.max(PANEL_MIN_WIDTH, r.origWidth + (e.clientX - r.startX)), maxWidth));
+  };
+  const handlePanelResizeEnd = () => {
+    resizeStateRef.current = null;
+    window.removeEventListener('mousemove', handlePanelResizeMove);
+    window.removeEventListener('mouseup', handlePanelResizeEnd);
+  };
+  const handlePanelResizeStart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    resizeStateRef.current = { startX: e.clientX, origWidth: panelWidth };
+    window.addEventListener('mousemove', handlePanelResizeMove);
+    window.addEventListener('mouseup', handlePanelResizeEnd);
+  };
 
   const activeAngles = activeTab === 'alpha' ? anglesAlpha : anglesBeta;
   const setActiveAngles = activeTab === 'alpha' ? setAnglesAlpha : setAnglesBeta;
@@ -86,10 +174,25 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
   };
 
   return (
-    <div className="absolute top-20 right-4 z-10 w-80 bg-[#0F0F10]/95 backdrop-blur-md border border-[#222226] rounded-xl shadow-2xl text-[#E0E0E0] p-3.5 space-y-3 font-sans">
-      {/* Title */}
+    <div
+      className="absolute z-10 bg-[#0F0F10]/95 backdrop-blur-md border border-[#222226] rounded-xl shadow-2xl text-[#E0E0E0] p-3.5 space-y-3 font-sans"
+      style={{ left: panelPos.x, top: panelPos.y, width: panelWidth }}
+    >
+      {/* Resize handle — drag to change panel width */}
+      <div
+        onMouseDown={handlePanelResizeStart}
+        title="드래그해서 패널 폭 조절"
+        className="absolute top-0 right-0 h-full w-2 cursor-ew-resize hover:bg-[#3B82F6]/30 rounded-r-xl"
+      />
+
+      {/* Title (drag handle — drag to move the panel) */}
       <div className="flex items-center justify-between pb-2 border-b border-[#222226]">
-        <div className="flex items-center gap-2">
+        <div
+          onMouseDown={handlePanelDragStart}
+          title="드래그해서 패널 위치 이동"
+          className="flex items-center gap-2 cursor-move select-none"
+        >
+          <GripHorizontal className="w-3.5 h-3.5 text-[#555]" />
           <Sliders className="w-3.5 h-3.5 text-[#3B82F6]" />
           <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#888888] font-mono">
             Kinematic_Joint_Sliders
@@ -145,6 +248,24 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
           >
             <Scale className="w-3.5 h-3.5" />
           </button>
+          <button
+            onClick={() => {
+              setMujocoLive((prev) => !prev);
+              soundEngine.playClick(mujocoLive ? 500 : 900);
+            }}
+            className={`p-1 rounded border transition-colors ${
+              mujocoLive
+                ? mujocoStatus === 'connected'
+                  ? 'bg-[#0F1E2E] border-[#38bdf8] text-[#38bdf8]'
+                  : mujocoStatus === 'error'
+                  ? 'bg-[#2E0F0F] border-[#f87171] text-[#f87171]'
+                  : 'bg-[#2E260F] border-[#facc15] text-[#facc15]'
+                : 'bg-[#111113] border-[#222226] text-[#666] hover:text-[#38bdf8]'
+            }`}
+            title="MuJoCo Live (Alpha 오른팔) — 오른팔 7개 슬라이더를 실제 MuJoCo 물리 브리지(ws://<host>:8765)의 PD 제어 목표로 전송하고, 돌아오는 관절각으로 렌더링을 갱신 (관절 이름 1:1 순서 매핑, 해부학적으로 정확하지 않은 근사)"
+          >
+            <Cpu className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
@@ -157,6 +278,25 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
       {showComOverlay && (
         <div className="text-[10px] text-center text-[#a3e635] font-mono -mt-1">
           ⚖️ 무게중심/ZMP 표시 ON — 구슬(CoM) 빨강=정적 불안정, 고리(ZMP) 노랑=미끄러짐 위험/빨강=동적 불안정
+        </div>
+      )}
+
+      {mujocoLive && (
+        <div
+          className={`text-[10px] text-center font-mono -mt-1 ${
+            mujocoStatus === 'connected'
+              ? 'text-[#38bdf8]'
+              : mujocoStatus === 'error'
+              ? 'text-[#f87171]'
+              : 'text-[#facc15]'
+          }`}
+        >
+          🖥️ MuJoCo Live (Alpha 오른팔){' '}
+          {mujocoStatus === 'connected'
+            ? 'ON — 실제 물리 브리지 연결됨'
+            : mujocoStatus === 'error'
+            ? '연결 실패 (브리지 서버 확인 필요)'
+            : '연결 중...'}
         </div>
       )}
 

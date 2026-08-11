@@ -4,7 +4,7 @@ import { Header } from './components/Header';
 import { SimulationHUD } from './components/SimulationHUD';
 import { TelemetryPanel } from './components/TelemetryPanel';
 import { KinematicControls } from './components/KinematicControls';
-import { CameraPreset, DEFAULT_JOINT_ANGLES, HandshakeMode, JointAngles, RobotTheme, TelemetryData } from './types';
+import { CameraPreset, DEFAULT_JOINT_ANGLES, HandshakeMode, JointAngles, MujocoBridgeStatus, RobotTheme, TelemetryData } from './types';
 
 const MANUAL_POSE_STORAGE_KEY = 'fingershake_manual_pose_v1';
 
@@ -59,6 +59,13 @@ export default function App() {
   // of mass and support polygon, and whether the pose is statically stable.
   const [showComOverlay, setShowComOverlay] = useState<boolean>(false);
 
+  // MuJoCo Live — connects Alpha's right-arm sliders to the real MuJoCo
+  // physics bridge (scripts/mujoco_bridge_server.py, ws://<host>:8765) instead
+  // of driving that arm's rotations directly from the slider values. See
+  // thesis 2026-08-12-moojoco-option-b-stage4-frontend.
+  const [mujocoLive, setMujocoLive] = useState<boolean>(false);
+  const [mujocoStatus, setMujocoStatus] = useState<MujocoBridgeStatus>('disconnected');
+
   const [telemetry, setTelemetry] = useState<TelemetryData>({
     contactDistance: 12,
     gripForce: 65,
@@ -104,6 +111,8 @@ export default function App() {
           manualAnglesBeta={manualAnglesBeta}
           groundLock={groundLock}
           showComOverlay={showComOverlay}
+          mujocoLive={mujocoLive}
+          onMujocoStatusChange={setMujocoStatus}
           onTelemetryUpdate={setTelemetry}
         />
       </main>
@@ -122,6 +131,9 @@ export default function App() {
           setGroundLock={setGroundLock}
           showComOverlay={showComOverlay}
           setShowComOverlay={setShowComOverlay}
+          mujocoLive={mujocoLive}
+          setMujocoLive={setMujocoLive}
+          mujocoStatus={mujocoStatus}
         />
       )}
 

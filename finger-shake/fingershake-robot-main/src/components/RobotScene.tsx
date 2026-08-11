@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { buildBipedalRobot, RobotJointRefs, getThemeColors } from './RobotBuilder';
-import { CameraPreset, HandshakeMode, JointAngles, RobotTheme, TelemetryData } from '../types';
+import { CameraPreset, HandshakeMode, JointAngles, MujocoBridgeStatus, RobotTheme, TelemetryData } from '../types';
 import { soundEngine } from '../utils/audio';
 
 interface RobotSceneProps {
@@ -19,8 +19,25 @@ interface RobotSceneProps {
   manualAnglesBeta: JointAngles;
   groundLock: boolean;
   showComOverlay: boolean;
+  mujocoLive: boolean;
+  onMujocoStatusChange?: (status: MujocoBridgeStatus) => void;
   onTelemetryUpdate: (data: TelemetryData) => void;
 }
+
+// Option B (MuJoCo backend) frontend integration — Alpha's right arm only.
+// The MJCF's 7-DOF serial arm (right_joint_1..7) doesn't correspond
+// anatomically to shoulderPitch/Yaw/Roll, elbowFlexion, wristPitch/Roll/Yaw;
+// this is a deliberate index-order approximation, not real IK retargeting
+// (see thesis 2026-08-12-moojoco-option-b-stage1-scoping and -stage4-frontend).
+const MUJOCO_RIGHT_ARM_ACTUATORS = [
+  'right_joint1_ctrl',
+  'right_joint2_ctrl',
+  'right_joint3_ctrl',
+  'right_joint4_ctrl',
+  'right_joint5_ctrl',
+  'right_joint6_ctrl',
+  'right_joint7_ctrl',
+] as const;
 
 // --- Stage 1 contact-dynamics approximation (see thesis
 // 2026-08-11-moojoco-contact-dynamics-plan): mass-weighted center of mass
@@ -340,6 +357,8 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
   manualAnglesBeta,
   groundLock,
   showComOverlay,
+  mujocoLive,
+  onMujocoStatusChange,
   onTelemetryUpdate,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -364,6 +383,11 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
   const timeRef = useRef<number>(0);
   const frameIdRef = useRef<number>(0);
   const lastClaspSoundRef = useRef<number>(0);
+
+  // MuJoCo Live — see MUJOCO_RIGHT_ARM_ACTUATORS above.
+  const mujocoSocketRef = useRef<WebSocket | null>(null);
+  const mujocoQposRef = useRef<Record<string, number> | null>(null);
+  const mujocoLastSendRef = useRef<number>(0);
   const rlEpisodeRef = useRef<number>(1);
   const rlLastPhaseRef = useRef<string>('seeking');
 
@@ -564,6 +588,42 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
     robotBetaRef.current.chestLight.color.setHex(colorsBeta.chest);
     robotBetaRef.current.visorMesh.material = new THREE.MeshBasicMaterial({ color: colorsBeta.visor });
   }, [theme]);
+
+  // MuJoCo Live — open/close the WebSocket bridge connection. Kept in its own
+  // effect (deps: [mujocoLive] only) so toggling sliders doesn't reconnect the
+  // socket; per-frame target sends and qpos reads happen in the animate loop
+  // below via mujocoSocketRef/mujocoQposRef.
+  useEffect(() => {
+    if (!mujocoLive) {
+      mujocoSocketRef.current?.close();
+      mujocoSocketRef.current = null;
+      mujocoQposRef.current = null;
+      onMujocoStatusChange?.('disconnected');
+      return;
+    }
+    onMujocoStatusChange?.('connecting');
+    const ws = new WebSocket(`ws://${window.location.hostname}:8765`);
+    mujocoSocketRef.current = ws;
+    ws.onopen = () => onMujocoStatusChange?.('connected');
+    ws.onerror = () => onMujocoStatusChange?.('error');
+    ws.onclose = () => {
+      onMujocoStatusChange?.('disconnected');
+      if (mujocoSocketRef.current === ws) mujocoSocketRef.current = null;
+    };
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg && typeof msg.qpos === 'object') mujocoQposRef.current = msg.qpos;
+      } catch {
+        // ignore malformed frame
+      }
+    };
+    return () => {
+      ws.close();
+      if (mujocoSocketRef.current === ws) mujocoSocketRef.current = null;
+      mujocoQposRef.current = null;
+    };
+  }, [mujocoLive]);
 
   // Toggle Grid
   useEffect(() => {
@@ -776,6 +836,46 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
           alpha.rightWrist.rotation.x = manualAnglesAlpha.wristPitch * degToRad;
           alpha.rightWrist.rotation.z = manualAnglesAlpha.wristRoll * degToRad;
           alpha.rightWrist.rotation.y = manualAnglesAlpha.wristYaw * degToRad;
+
+          // MuJoCo Live — send the current slider values as PD targets (throttled
+          // to 10Hz, plenty for a slowly-moving target), then overwrite the same
+          // four groups with whatever qpos MuJoCo last reported. This makes
+          // Alpha's right arm visually lag/settle like the physically-simulated
+          // arm instead of snapping instantly to the slider value.
+          if (mujocoLive) {
+            const ws = mujocoSocketRef.current;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              const now = performance.now();
+              if (now - mujocoLastSendRef.current > 100) {
+                mujocoLastSendRef.current = now;
+                const [a1, a2, a3, a4, a5, a6, a7] = MUJOCO_RIGHT_ARM_ACTUATORS;
+                ws.send(
+                  JSON.stringify({
+                    target: {
+                      [a1]: manualAnglesAlpha.shoulderPitch * degToRad,
+                      [a2]: manualAnglesAlpha.shoulderYaw * degToRad,
+                      [a3]: manualAnglesAlpha.shoulderRoll * degToRad,
+                      [a4]: manualAnglesAlpha.elbowFlexion * degToRad,
+                      [a5]: manualAnglesAlpha.wristPitch * degToRad,
+                      [a6]: manualAnglesAlpha.wristRoll * degToRad,
+                      [a7]: manualAnglesAlpha.wristYaw * degToRad,
+                    },
+                  })
+                );
+              }
+            }
+            const qpos = mujocoQposRef.current;
+            if (qpos) {
+              if (qpos.right_joint_1 !== undefined) alpha.rightShoulder.rotation.x = qpos.right_joint_1;
+              if (qpos.right_joint_2 !== undefined) alpha.rightShoulder.rotation.y = qpos.right_joint_2;
+              if (qpos.right_joint_3 !== undefined) alpha.rightShoulder.rotation.z = qpos.right_joint_3;
+              if (qpos.right_joint_4 !== undefined) alpha.rightElbow.rotation.x = qpos.right_joint_4;
+              if (qpos.right_joint_5 !== undefined) alpha.rightWrist.rotation.x = qpos.right_joint_5;
+              if (qpos.right_joint_6 !== undefined) alpha.rightWrist.rotation.z = qpos.right_joint_6;
+              if (qpos.right_joint_7 !== undefined) alpha.rightWrist.rotation.y = qpos.right_joint_7;
+            }
+          }
+
           alpha.torso.rotation.y = manualAnglesAlpha.torsoYaw * degToRad;
           alpha.torso.rotation.x = manualAnglesAlpha.torsoPitch * degToRad;
           alpha.leftAnkle.rotation.x = manualAnglesAlpha.footPitch * degToRad;
@@ -1133,7 +1233,7 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
     return () => {
       if (frameIdRef.current) cancelAnimationFrame(frameIdRef.current);
     };
-  }, [isPlaying, speed, mode, manualAnglesAlpha, manualAnglesBeta, groundLock, showComOverlay]);
+  }, [isPlaying, speed, mode, manualAnglesAlpha, manualAnglesBeta, groundLock, showComOverlay, mujocoLive]);
 
   return (
     <div className="relative w-full h-full min-h-[400px] overflow-hidden bg-slate-950">
