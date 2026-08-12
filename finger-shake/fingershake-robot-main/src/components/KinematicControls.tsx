@@ -72,9 +72,20 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
   const [activeTab, setActiveTab] = useState<'alpha' | 'beta'>('alpha');
   const [saveStatus, setSaveStatus] = useState<string>('');
 
-  const [panelPos, setPanelPos] = useState<{ x: number; y: number }>(
-    () => loadPanelLayout() ?? { x: Math.max(8, window.innerWidth - PANEL_DEFAULT_WIDTH - 16), y: PANEL_DEFAULT_TOP }
-  );
+  const [panelPos, setPanelPos] = useState<{ x: number; y: number }>(() => {
+    const saved = loadPanelLayout();
+    if (saved) {
+      // Position was persisted from whatever window size it was last dragged
+      // in — clamp it into the CURRENT window so a saved position from a
+      // wider/taller screen doesn't leave the panel off-screen (or leave the
+      // resize-handle math with zero/negative room to work with) here.
+      return {
+        x: Math.min(Math.max(0, saved.x), Math.max(0, window.innerWidth - 40)),
+        y: Math.min(Math.max(0, saved.y), Math.max(0, window.innerHeight - 40)),
+      };
+    }
+    return { x: Math.max(8, window.innerWidth - PANEL_DEFAULT_WIDTH - 16), y: PANEL_DEFAULT_TOP };
+  });
   const [panelWidth, setPanelWidth] = useState<number>(() => loadPanelLayout()?.width ?? PANEL_DEFAULT_WIDTH);
   const [sliderAreaHeight, setSliderAreaHeight] = useState<number>(
     () => loadPanelLayout()?.sliderAreaHeight ?? SLIDER_AREA_DEFAULT_HEIGHT
@@ -117,7 +128,11 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
   const handlePanelResizeMove = (e: MouseEvent) => {
     const r = resizeStateRef.current;
     if (!r) return;
-    const maxWidth = Math.min(PANEL_MAX_WIDTH, window.innerWidth - panelPos.x - 8);
+    // The available-room cap must never fall below PANEL_MIN_WIDTH itself —
+    // otherwise (e.g. panelPos.x close to window.innerWidth) this clamp
+    // silently pins the width to a tiny/negative value and the handle
+    // appears to do nothing.
+    const maxWidth = Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, window.innerWidth - panelPos.x - 8));
     setPanelWidth(Math.min(Math.max(PANEL_MIN_WIDTH, r.origWidth + (e.clientX - r.startX)), maxWidth));
   };
   const handlePanelResizeEnd = () => {
@@ -135,7 +150,12 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
   const handlePanelVResizeMove = (e: MouseEvent) => {
     const r = vResizeStateRef.current;
     if (!r) return;
-    const maxHeight = Math.min(SLIDER_AREA_MAX_HEIGHT, window.innerHeight - panelPos.y - 160);
+    // Same fix as the width handle above — never let the cap drop below the
+    // minimum itself.
+    const maxHeight = Math.max(
+      SLIDER_AREA_MIN_HEIGHT,
+      Math.min(SLIDER_AREA_MAX_HEIGHT, window.innerHeight - panelPos.y - 160)
+    );
     setSliderAreaHeight(
       Math.min(Math.max(SLIDER_AREA_MIN_HEIGHT, r.origHeight + (e.clientY - r.startY)), maxHeight)
     );
@@ -226,20 +246,23 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
         className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-[#3B82F6]/30 rounded-b-xl"
       />
 
-      {/* Title (drag handle — drag to move the panel) */}
-      <div className="flex items-center justify-between pb-2 border-b border-[#222226]">
+      {/* Title (drag handle — drag to move the panel). min-w-0 + truncate on
+          the title lets THIS side shrink first as the panel narrows, so the
+          icon row on the right (flex-shrink-0) always stays fully visible
+          instead of spilling past the panel/window edge. */}
+      <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#222226]">
         <div
           onMouseDown={handlePanelDragStart}
           title="드래그해서 패널 위치 이동"
-          className="flex items-center gap-2 cursor-move select-none"
+          className="flex items-center gap-2 cursor-move select-none min-w-0"
         >
-          <GripHorizontal className="w-3.5 h-3.5 text-[#555]" />
-          <Sliders className="w-3.5 h-3.5 text-[#3B82F6]" />
-          <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#888888] font-mono">
+          <GripHorizontal className="w-3.5 h-3.5 text-[#555] shrink-0" />
+          <Sliders className="w-3.5 h-3.5 text-[#3B82F6] shrink-0" />
+          <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#888888] font-mono truncate">
             Kinematic_Joint_Sliders
           </h3>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={savePose}
             className="p-1 rounded bg-[#111113] hover:bg-[#1A1A1D] border border-[#222226] text-[#666] hover:text-[#34d399] transition-colors"
