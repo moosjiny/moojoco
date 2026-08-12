@@ -28,7 +28,11 @@ export interface JointAngles {
   footPitch: number; // ankle dorsiflexion(+)/plantarflexion(-), degrees, applied to both feet
   hipFlexion: number; // degrees, applied symmetrically to both hips
   kneeFlexion: number; // degrees, applied symmetrically to both knees
-  // Left arm — independent from the right arm sliders above (no longer mirrored).
+  // Left arm — posed independently from the right arm sliders above (separate
+  // values), but the underlying geometry is a true anatomical mirror (see
+  // leftArmMirror in RobotBuilder.ts), so the same numeric value on each side
+  // now bends the same anatomical way — e.g. leftElbowFlexion=120 curls the
+  // forearm up like elbowFlexion=120 does, just mirrored, not skewed.
   // Left hand/wrist geometry doesn't exist yet (leftHand is a plain box), so there
   // is no left-side wrist/finger control until that geometry is built.
   leftShoulderPitch: number;
@@ -56,8 +60,8 @@ export const DEFAULT_JOINT_ANGLES: JointAngles = {
   hipFlexion: 0,
   kneeFlexion: 0,
   leftShoulderPitch: -64,
-  leftShoulderYaw: 20,
-  leftShoulderRoll: 12,
+  leftShoulderYaw: -20,
+  leftShoulderRoll: -12,
   leftElbowFlexion: 50,
 };
 

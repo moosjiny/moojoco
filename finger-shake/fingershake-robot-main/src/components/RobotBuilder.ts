@@ -270,9 +270,20 @@ export function buildBipedalRobot(
   pelvisGroup.add(rightLeg.hipGroup);
 
   // 5. Left Arm (Standard rest posture)
+  // Anatomical mirror: the left arm reuses the exact same local geometry and
+  // rotation formulas as the right arm (see manualAnglesAlpha.leftShoulder*
+  // application in RobotScene.tsx — same sign, no per-axis flipping there).
+  // A true mirror image only comes for free if the whole subtree sits inside
+  // a negative-X-scale wrapper; without it, yaw/roll rotations diverge from
+  // the right arm's as the angle grows even though pitch/elbow look fine
+  // near 0 (see thesis 2026-08-12-moojoco-left-arm-elbow-asymmetry-bug).
+  const leftArmMirror = new THREE.Group();
+  leftArmMirror.position.set(-0.32, 0.5, 0);
+  leftArmMirror.scale.set(-1, 1, 1);
+  torsoGroup.add(leftArmMirror);
+
   const leftShoulder = new THREE.Group();
-  leftShoulder.position.set(-0.32, 0.5, 0);
-  torsoGroup.add(leftShoulder);
+  leftArmMirror.add(leftShoulder);
 
   const leftShoulderCap = new THREE.Mesh(
     new THREE.SphereGeometry(0.09, 12, 12),
