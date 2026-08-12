@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { buildBipedalRobot, RobotJointRefs, getThemeColors } from './RobotBuilder';
+import { buildBipedalRobot, RobotJointRefs, getThemeColors, JointAxis } from './RobotBuilder';
 import { CameraPreset, HandshakeMode, JointAngles, MujocoBridgeStatus, RobotTheme, TelemetryData } from '../types';
 import { soundEngine } from '../utils/audio';
 
@@ -97,6 +97,36 @@ function getFootWorldCorners(ankle: THREE.Group): THREE.Vector3[] {
     new THREE.Vector3(halfW, soleY, centerZ + halfD),
     new THREE.Vector3(-halfW, soleY, centerZ + halfD),
   ].map((v) => ankle.localToWorld(v));
+}
+
+// Rotation-axis debug gizmo — colored rings (R=X, G=Y, B=Z) parented to a
+// clicked joint's group so they inherit its live pose. See markJoint() in
+// RobotBuilder.ts for which meshes are clickable and which axes they show.
+const JOINT_GIZMO_AXIS_COLOR: Record<JointAxis, number> = { x: 0xff4d4d, y: 0x4ade80, z: 0x60a5fa };
+
+function createJointGizmo(axes: JointAxis[]): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'joint_gizmo';
+  const radius = 0.11;
+  const tube = 0.004;
+  axes.forEach((axis) => {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(radius, tube, 8, 48),
+      new THREE.MeshBasicMaterial({
+        color: JOINT_GIZMO_AXIS_COLOR[axis],
+        transparent: true,
+        opacity: 0.9,
+        depthTest: false,
+      })
+    );
+    ring.renderOrder = 999;
+    // TorusGeometry's ring normal is +Z by default; rotate so the normal
+    // points down the axis it represents.
+    if (axis === 'x') ring.rotation.y = Math.PI / 2;
+    if (axis === 'y') ring.rotation.x = Math.PI / 2;
+    group.add(ring);
+  });
+  return group;
 }
 
 interface Point2D {
@@ -388,6 +418,13 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
   const mujocoSocketRef = useRef<WebSocket | null>(null);
   const mujocoQposRef = useRef<Record<string, number> | null>(null);
   const mujocoLastSendRef = useRef<number>(0);
+
+  // Joint rotation-axis debug gizmo (see createJointGizmo above) — click a
+  // joint's marker mesh to show its axis rings, click again (or click empty
+  // space) to clear.
+  const selectedJointGizmoRef = useRef<THREE.Group | null>(null);
+  const selectedJointMeshRef = useRef<THREE.Object3D | null>(null);
+  const [selectedJointLabel, setSelectedJointLabel] = useState<string | null>(null);
   const rlEpisodeRef = useRef<number>(1);
   const rlLastPhaseRef = useRef<string>('seeking');
 
@@ -550,6 +587,56 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
     robotAlphaRef.current = robotAlpha;
     robotBetaRef.current = robotBeta;
 
+    // Joint rotation-axis debug gizmo — click a joint marker (see markJoint()
+    // in RobotBuilder.ts) to show colored rings (R=X, G=Y, B=Z) for the axes
+    // that joint actually rotates on. Click the same joint again, or empty
+    // space, to clear it.
+    const clearJointGizmo = () => {
+      const gizmo = selectedJointGizmoRef.current;
+      if (gizmo) {
+        gizmo.parent?.remove(gizmo);
+        gizmo.traverse((o) => {
+          if (o instanceof THREE.Mesh) {
+            o.geometry.dispose();
+            (o.material as THREE.Material).dispose();
+          }
+        });
+      }
+      selectedJointGizmoRef.current = null;
+      selectedJointMeshRef.current = null;
+      setSelectedJointLabel(null);
+    };
+
+    const handleJointClick = (event: MouseEvent) => {
+      if (!containerRef.current || !cameraRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const ndc = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(ndc, cameraRef.current);
+      const targets = [robotAlphaRef.current?.root, robotBetaRef.current?.root].filter(
+        (o): o is THREE.Group => !!o
+      );
+      const hits = raycaster.intersectObjects(targets, true);
+      const jointHit = hits.find((h) => h.object.userData.isJointMarker);
+
+      const wasSameJoint = jointHit && jointHit.object === selectedJointMeshRef.current;
+      clearJointGizmo();
+      if (!jointHit || wasSameJoint) return;
+
+      const group = jointHit.object.userData.jointGroup as THREE.Object3D;
+      const axes = jointHit.object.userData.jointAxes as JointAxis[];
+      const label = jointHit.object.userData.jointLabel as string;
+      const gizmo = createJointGizmo(axes);
+      group.add(gizmo);
+      selectedJointGizmoRef.current = gizmo;
+      selectedJointMeshRef.current = jointHit.object;
+      setSelectedJointLabel(label);
+    };
+    renderer.domElement.addEventListener('click', handleJointClick);
+
     // Handle Resize
     const handleResize = () => {
       if (!containerRef.current || !rendererRef.current || !cameraRef.current) return;
@@ -566,6 +653,7 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
     return () => {
       if (frameIdRef.current) cancelAnimationFrame(frameIdRef.current);
       resizeObserver.disconnect();
+      renderer.domElement.removeEventListener('click', handleJointClick);
       if (rendererRef.current && rendererRef.current.domElement) {
         rendererRef.current.domElement.remove();
       }
@@ -1238,6 +1326,22 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
   return (
     <div className="relative w-full h-full min-h-[400px] overflow-hidden bg-slate-950">
       <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+      {selectedJointLabel && (
+        <div className="absolute bottom-24 left-4 z-10 bg-[#0F0F10]/90 backdrop-blur-md border border-[#222226] rounded-lg px-3 py-2 text-[11px] font-mono text-[#E0E0E0] pointer-events-none">
+          <div className="font-bold text-[#8ab4f8] mb-1">{selectedJointLabel}</div>
+          <div className="flex items-center gap-3 text-[#888]">
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full inline-block" style={{ background: '#ff4d4d' }} /> X축
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full inline-block" style={{ background: '#4ade80' }} /> Y축
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full inline-block" style={{ background: '#60a5fa' }} /> Z축
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

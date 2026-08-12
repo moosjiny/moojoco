@@ -1,36 +1,43 @@
-# Moojoco 미션 상태 — 2026-08-12
+# Moojoco 미션 상태 — 2026-08-12 (세션 종료 시점)
 
-## 이번 세션 완료 작업 (fingershake-robot-main, http://hb5u.hyperbook.com:8600/)
+## 이번 세션 완료 작업 요약
 
-물리엔진 근사 기능 4건을 계획→구현→실측→배포→thesis 순으로 완료:
+이전 세션(같은 날짜 앞부분, `memory/project_state.md` 구버전)에서 접촉 동역학 1·2단계까지 마친 뒤, 이번 세션에서 옵션 B(MuJoCo 실물리 백엔드) 전체와 그 파생 작업을 진행했다. 세부 기록은 전부 thesis.hyperbook.com에 있고, 여기서는 무엇이 어디까지 됐는지만 요약한다.
 
-1. **지면 고정(Ground Lock)** — 고관절/무릎/발목 슬라이더를 굽혀도 발바닥이 항상 바닥(y=0)에 붙도록 순기구학으로 root Y를 보정. commit `a2e8ea0`.
-   thesis: https://thesis.hyperbook.com/papers/2026-08-11-moojoco-ground-lock-physics-approximation
+### 옵션 B — 팔 트랙 (완료)
+B-1(조사) → B-2(WebSocket 브리지 `mujoco_bridge_server.py`) → B-3(PD 위치제어 레이어) → B-4(프론트엔드 "MuJoCo Live" 토글, Alpha 오른팔) 순서로 완료. 브리지는 `mujoco_arm_bridge.service`(포트 8765)로 **상시 서비스화 완료**, 사령관이 직접 systemd 설치.
 
-2. **접촉 동역학 3단계 계획** — 마찰·ZMP·무게중심 도입 로드맵(1단계 CoM+지지다각형, 2단계 동적 ZMP+마찰원뿔, 3단계 진짜 강체 동역학[옵션A 클라이언트 물리엔진 vs 옵션B MuJoCo 백엔드]).
-   thesis: https://thesis.hyperbook.com/papers/2026-08-11-moojoco-contact-dynamics-plan
+### 옵션 B — 다리 트랙 (완료)
+B-5-1(자유부유 바이페달 최소 모델 `urdf/biped_balance_test.xml`, 물리 검증) → B-5-2(균형 제어기, 20초 안정) → B-5-3(스트리밍 브리지 `biped_bridge_server.py`, 포트 8766) → B-5-4(고관절 전략 추가, push 내성 15N→20N 확장). 이 브리지는 **아직 상시 서비스 아님**(검증 후 매번 종료).
 
-3. **1단계: CoM + 지지 다각형 + 정적 안정성** — 신체 분절 질량비(머리7/몸통40/팔각8/다리각18.5)로 무게중심 계산, convex hull로 지지 다각형 구성, STABLE/UNSTABLE 판정. commit `dffa97b`.
-   thesis: https://thesis.hyperbook.com/papers/2026-08-12-moojoco-com-support-polygon-result
+### 장기 로드맵 기록
+Phase 1(팔+다리 통합 단일 모델, 다음 후보 B-5-5) → Phase 2(프론트엔드 실제 물리 연동, 원래 목표) → Phase 3(좌우 균형+큰 외란 대응) → Phase 4(두 로봇 통합+악수 커플링). thesis: `2026-08-12-moojoco-option-b-long-term-roadmap`.
 
-4. **2단계: 동적 ZMP + 마찰원뿔** — CoM을 실경과시간으로 수치미분(EMA 스무딩)해 도립진자 ZMP 공식 적용, 마찰원뿔 비율로 미끄러짐 위험 판정. commit `d54d3b6`.
-   thesis: https://thesis.hyperbook.com/papers/2026-08-12-moojoco-dynamic-zmp-friction-result
+### 왼팔 팔꿈치 비대칭 버그 — 발견·수정 완료
+사령관이 "왼쪽 오른팔 범위가 바뀐 것 같다"고 지적 → 실측으로 확인(오른팔은 정상, 왼팔은 바깥/아래로 꺾임) → 원인: 왼팔이 오른팔과 동일 지오메트리를 재사용할 뿐 진짜 거울 복제가 아니었음 → `dual_openarm.urdf`가 이미 올바른 대칭 설계(관절별 origin 부호 반전 + joint_2만 axis 반전 + 메시 거울 복제)임을 확인 → fingershake는 `leftArmMirror`(scale.set(-1,1,1)) 래퍼로 수정, 회전 적용 코드는 한 줄도 안 바꿈. thesis 3편: `left-arm-elbow-asymmetry-bug`, `anatomical-symmetric-arm-search`, `left-arm-mirror-fix`.
 
-5. **저장 백업 + 기본 테마 변경** — 저장 버튼이 기존 값을 덮어쓰기 전 백업 키로 이동, 기본 테마 Cyber Blue → Titanium Silver. commit `b011173`.
+### 관절 회전축 디버그 기즈모 (신규, 커밋 대기 중 — 세션 종료 시점)
+미러 수정 후에도 사령관이 "여전히 바깥으로 굽는 것 같다"고 재지적, "관절 클릭하면 회전 링이 보이면 좋겠다"고 요청 → 클릭 가능한 관절(어깨/팔꿈치/손목/고관절/무릎/발목)에 R/G/B 회전축 링을 표시하는 기능 구현·배포·실측 검증 완료. **⚠️ 코드는 배포됐지만 git 커밋은 아직 안 함(사령관 확인 대기 중이었음).**
 
-3단계(진짜 강체 동역학)는 옵션 A(클라이언트 JS 물리엔진)/B(MuJoCo 백엔드 연동) 중 방향 결정 대기 중 — 사령관 판단 필요.
+## 별개 트랙 — 한글 말투 개선
+
+사령관이 "안 참고해"보다 "참고하지 않아"가 매끄럽다고 지적 → ROOPS thesis의 새 지속 트랙으로 지정. 격식 문서(thesis/커밋 메시지)엔 구어체 부정형("안 X") 대신 문어체("X하지 않다") 우선. 이어서 thesis 100개 도메인 분류표(C001-C100)에 국어학/문체 전용 분야가 없다는 빈틈도 확인·기록(결정은 EOS/사령관 몫으로 남김). thesis 2편 + ntfy로 Aegis에게 STT/TTS 로드맵 제안(로봇이 결국 듣고 말해야 하니 이 방향이 도움될 것이라는 취지)도 발송함.
 
 ## 이번 세션에서 겪은 실수·교훈
 
-- **뷰포트 폭 차이로 아이콘 오클릭**: 여러 다른 창 크기에서 좌표 클릭을 재사용하다 "저장" 버튼을 실수로 눌러 이상한 테스트 자세를 localStorage에 덮어씀 — 즉시 사령관께 공개하고, 재발 방지로 저장 백업 기능을 추가함.
-- **같은 URL로 navigate해도 실제 새로고침이 안 됨**: 세션 내내 재사용한 브라우저 탭 하나가 1·2단계 배포 이후에도 실제로는 새로고침되지 않아 낡은 JS 번들을 계속 실행 중이었음(Scale/CoM 버튼이 아예 없었음). `?cachebust=<timestamp>` 쿼리로 강제 새로고침해 해결. **앞으로 프로덕션 재검증 시 항상 새 탭을 만들거나 cachebust 쿼리를 붙일 것.**
-- 사령관이 "지금 자세면 앞으로 쓰러져야 할 것 같다"고 직관적으로 지적한 것이 실측(UNSTABLE -286mm)과 정확히 일치 — 물리 근사 로직이 실제로 타당하게 동작한다는 방증.
+- **NTFY_TOKEN_MOOJOCO가 `~/.env_roops`에 실제로는 없었음** — publish 시도가 403으로 실패, CLAUDE.md에 하드코딩된 값으로 우회. 다음 세션에서 env 파일에 정식 추가 고려.
+- **관절 클릭 디버깅 중 반나절(체감) 삽질**: 화면 정중앙이 두 로봇 손이 맞닿는 빈 공간이라 raycaster가 계속 0 hit — raycaster 자체는 처음부터 정상이었는데 클릭 좌표를 로봇 몸통이 아니라 빈 공간에 겨냥해서 생긴 문제. 디버그 로그(console.log)를 임시로 넣어서야 확정 진단함 — 스크린샷 눈대중보다 실제 raycasting 결과 로그가 훨씬 빠르고 정확했음.
+- **브라우저 확장이 세션 중 두 번 연결 끊김** — 재시도로 복구됨, 별다른 조치 불필요했음.
 
 ## 다음 세션 우선순위
 
-1. 3단계(진짜 강체 동역학) 방향 결정 — 사령관에게 옵션 A/B 재확인
-2. (미해결) 사령관이 세션 중 보낸 "029"라는 메시지의 의도 확인 필요 — 맥락 없이 전달됨
-3. [[project_fingershake_dof_roadmap]]의 기존 후속 과제도 여전히 유효: 왼팔 손목/손 지오메트리, 손가락 PIP/DIP 독립화, 다리 좌우 비대칭, 자동 악수 모드에 신규 DOF 반영
+1. **관절 회전축 기즈모 커밋 여부 확인** — 세션 종료 시점에 git status: `RobotBuilder.ts`, `RobotScene.tsx` 미커밋 상태로 남음
+2. 사령관이 새 기즈모 도구로 직접 팔꿈치 축 방향을 확인한 뒤 "여전히 바깥으로 굽는다"가 맞다면 회전 부호 수정 필요 — 이번엔 도구만 만들고 판단은 사령관에게 넘김
+3. B-5-5(팔+다리 통합 단일 모델) — 로드맵상 다음 단계이지만 이번 세션엔 착수 안 함(왼팔 리팩터링·기즈모 작업으로 대체됨)
+4. 다리 브리지(`biped_bridge_server.py`, 8766) 상시 서비스화 여부 — 아직 미결정
+5. [[project_fingershake_dof_roadmap]]의 기존 후속 과제: 왼팔 손목/손 지오메트리, 손가락 PIP/DIP 독립화, 다리 좌우 비대칭
 
 ## 배포 상태
-- fingershake_web.service: 실행 중, 최신 코드 배포·재검증 완료 (사령관이 매번 직접 재시작 — 에이전트는 sudo 권한 없음)
+- `fingershake_web.service`: 실행 중, 최신 코드(기즈모 포함) 이미 서빙 중 — `vite preview`가 디스크에서 직접 읽어 재시작 불필요했음
+- `mujoco_arm_bridge.service`(포트 8765): **상시 서비스, 실행 중**
+- `biped_bridge_server.py`(포트 8766): 상시 서비스 아님, 현재 중지 상태

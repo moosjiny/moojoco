@@ -61,6 +61,29 @@ export function getThemeColors(theme: RobotTheme, isAlpha: boolean) {
   }
 }
 
+// Rotation-axis debug gizmo (see RobotScene.tsx handleJointClick): clicking a
+// marked mesh shows colored rings for each axis this joint's group actually
+// rotates on, letting the user visually correlate a slider with which way it
+// really turns instead of guessing from screenshots. jointGroup is the group
+// the gizmo rings get parented to (so they inherit the joint's live pose).
+export type JointAxis = 'x' | 'y' | 'z';
+
+// The visible joint-marker spheres are too small to click reliably, so this
+// adds an invisible, generously-sized sphere at the group's local origin
+// (every joint marker mesh in this file sits at (0,0,0) of its group) purely
+// as a raycasting target — independent of whatever the visual mesh looks like.
+function markJoint(jointGroup: THREE.Object3D, axes: JointAxis[], label: string) {
+  const hitTarget = new THREE.Mesh(
+    new THREE.SphereGeometry(0.09, 8, 8),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 })
+  );
+  hitTarget.userData.isJointMarker = true;
+  hitTarget.userData.jointGroup = jointGroup;
+  hitTarget.userData.jointAxes = axes;
+  hitTarget.userData.jointLabel = label;
+  jointGroup.add(hitTarget);
+}
+
 export function buildBipedalRobot(
   id: 'alpha' | 'beta',
   theme: RobotTheme = 'cyber'
@@ -215,6 +238,7 @@ export function buildBipedalRobot(
       jointMat
     );
     hipGroup.add(hipBall);
+    markJoint(hipGroup, ['x'], `${xSide < 0 ? '왼쪽' : '오른쪽'} 고관절 (Hip Flexion)`);
 
     const thighMesh = new THREE.Mesh(
       new THREE.CylinderGeometry(0.09, 0.07, 0.45, 12),
@@ -233,6 +257,7 @@ export function buildBipedalRobot(
       jointMat
     );
     kneeGroup.add(kneeJoint);
+    markJoint(kneeGroup, ['x'], `${xSide < 0 ? '왼쪽' : '오른쪽'} 무릎 (Knee Flexion)`);
 
     const calfMesh = new THREE.Mesh(
       new THREE.CylinderGeometry(0.07, 0.06, 0.45, 12),
@@ -252,6 +277,7 @@ export function buildBipedalRobot(
       jointMat
     );
     ankleGroup.add(ankleJoint);
+    markJoint(ankleGroup, ['x'], `${xSide < 0 ? '왼쪽' : '오른쪽'} 발목 (Foot Pitch)`);
 
     const footMesh = new THREE.Mesh(
       new THREE.BoxGeometry(0.14, 0.09, 0.28),
@@ -290,6 +316,7 @@ export function buildBipedalRobot(
     accentArmorMat
   );
   leftShoulder.add(leftShoulderCap);
+  markJoint(leftShoulder, ['x', 'y', 'z'], '왼쪽 어깨 (Shoulder Pitch/Yaw/Roll)');
 
   const leftUpperArm = new THREE.Mesh(
     new THREE.CylinderGeometry(0.065, 0.055, 0.38, 12),
@@ -308,6 +335,7 @@ export function buildBipedalRobot(
     jointMat
   );
   leftElbow.add(leftElbowJoint);
+  markJoint(leftElbow, ['x'], '왼쪽 팔꿈치 (Elbow Flexion)');
 
   const leftForearm = new THREE.Mesh(
     new THREE.CylinderGeometry(0.055, 0.045, 0.36, 12),
@@ -334,6 +362,7 @@ export function buildBipedalRobot(
     accentArmorMat
   );
   rightShoulder.add(rightShoulderCap);
+  markJoint(rightShoulder, ['x', 'y', 'z'], '오른쪽 어깨 (Shoulder Pitch/Yaw/Roll)');
 
   const rightUpperArm = new THREE.Mesh(
     new THREE.CylinderGeometry(0.065, 0.055, 0.38, 12),
@@ -352,6 +381,7 @@ export function buildBipedalRobot(
     jointMat
   );
   rightElbow.add(rightElbowJoint);
+  markJoint(rightElbow, ['x'], '오른쪽 팔꿈치 (Elbow Flexion)');
 
   const rightForearm = new THREE.Mesh(
     new THREE.CylinderGeometry(0.055, 0.045, 0.36, 12),
@@ -393,6 +423,7 @@ export function buildBipedalRobot(
   );
   ftSensorBase.rotation.x = Math.PI / 2;
   rightWrist.add(ftSensorBase);
+  markJoint(rightWrist, ['x', 'y', 'z'], '오른쪽 손목 (Wrist Pitch/Roll/Yaw)');
 
   const ftSensorRing = new THREE.Mesh(
     new THREE.CylinderGeometry(0.048, 0.048, 0.008, 16),
