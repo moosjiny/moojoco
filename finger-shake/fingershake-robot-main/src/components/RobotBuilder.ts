@@ -326,9 +326,18 @@ export function buildBipedalRobot(
   leftUpperArm.castShadow = true;
   leftShoulder.add(leftUpperArm);
 
+  // Elbow flexion rotates around local X. Mounted directly under the shoulder,
+  // that sweep goes toward -Z (torso back) instead of +Z (torso front) —
+  // see 2026-08-19-moojoco-elbow-flexion-gizmo-verification's correction.
+  // A static 180°-Y wrapper flips the sweep to +Z without touching any of the
+  // many call sites that set `leftElbow.rotation.x` directly.
+  const leftElbowFlexWrapper = new THREE.Group();
+  leftElbowFlexWrapper.rotation.y = Math.PI;
+  leftShoulder.add(leftElbowFlexWrapper);
+
   const leftElbow = new THREE.Group();
   leftElbow.position.set(0, -0.38, 0);
-  leftShoulder.add(leftElbow);
+  leftElbowFlexWrapper.add(leftElbow);
 
   const leftElbowJoint = new THREE.Mesh(
     new THREE.SphereGeometry(0.06, 12, 12),
@@ -372,9 +381,15 @@ export function buildBipedalRobot(
   rightUpperArm.castShadow = true;
   rightShoulder.add(rightUpperArm);
 
+  // Same fix as leftElbow above: a static 180°-Y wrapper so positive
+  // rotation.x flexion sweeps toward the torso front (+Z), not the back.
+  const rightElbowFlexWrapper = new THREE.Group();
+  rightElbowFlexWrapper.rotation.y = Math.PI;
+  rightShoulder.add(rightElbowFlexWrapper);
+
   const rightElbow = new THREE.Group();
   rightElbow.position.set(0, -0.38, 0);
-  rightShoulder.add(rightElbow);
+  rightElbowFlexWrapper.add(rightElbow);
 
   const rightElbowJoint = new THREE.Mesh(
     new THREE.SphereGeometry(0.06, 12, 12),
