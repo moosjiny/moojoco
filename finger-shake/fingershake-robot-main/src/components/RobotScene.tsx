@@ -39,6 +39,13 @@ const MUJOCO_RIGHT_ARM_ACTUATORS = [
   'right_joint7_ctrl',
 ] as const;
 
+// Base facing rotation each robot is built with (see robotAlpha/robotBeta.root
+// setup below). The manual-mode Body Yaw slider adds an offset on top of this
+// rather than replacing it, so 0 on the slider always means "as originally
+// posed", not "facing world +Z".
+const ALPHA_BASE_ROOT_YAW = Math.PI / 2 - 0.16;
+const BETA_BASE_ROOT_YAW = -Math.PI / 2 - 0.16;
+
 // --- Stage 1 contact-dynamics approximation (see thesis
 // 2026-08-11-moojoco-contact-dynamics-plan): mass-weighted center of mass
 // vs. the support polygon formed by both feet's ground contact points.
@@ -576,10 +583,10 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
     // Initial positioning facing each other at handshake distance
     // Robot Alpha on Left (-X), Robot Beta on Right (+X)
     robotAlpha.root.position.set(-0.54, 0, 0.08);
-    robotAlpha.root.rotation.y = Math.PI / 2 - 0.16;
+    robotAlpha.root.rotation.y = ALPHA_BASE_ROOT_YAW;
 
     robotBeta.root.position.set(0.54, 0, -0.08);
-    robotBeta.root.rotation.y = -Math.PI / 2 - 0.16;
+    robotBeta.root.rotation.y = BETA_BASE_ROOT_YAW;
 
     scene.add(robotAlpha.root);
     scene.add(robotBeta.root);
@@ -964,6 +971,7 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
             }
           }
 
+          alpha.root.rotation.y = ALPHA_BASE_ROOT_YAW + manualAnglesAlpha.bodyYaw * degToRad;
           alpha.torso.rotation.y = manualAnglesAlpha.torsoYaw * degToRad;
           alpha.torso.rotation.x = manualAnglesAlpha.torsoPitch * degToRad;
           alpha.leftAnkle.rotation.x = manualAnglesAlpha.footPitch * degToRad;
@@ -985,6 +993,7 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
           beta.rightWrist.rotation.x = manualAnglesBeta.wristPitch * degToRad;
           beta.rightWrist.rotation.z = manualAnglesBeta.wristRoll * degToRad;
           beta.rightWrist.rotation.y = manualAnglesBeta.wristYaw * degToRad;
+          beta.root.rotation.y = BETA_BASE_ROOT_YAW + manualAnglesBeta.bodyYaw * degToRad;
           beta.torso.rotation.y = manualAnglesBeta.torsoYaw * degToRad;
           beta.torso.rotation.x = manualAnglesBeta.torsoPitch * degToRad;
           beta.leftAnkle.rotation.x = manualAnglesBeta.footPitch * degToRad;

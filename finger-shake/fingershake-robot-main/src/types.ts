@@ -25,6 +25,10 @@ export interface JointAngles {
   pinkyCurl: number;
   torsoPitch: number;
   torsoYaw: number;
+  // Whole-robot yaw offset (root group, degrees) — rotates the entire robot
+  // (torso, arms, legs, base) as a rigid unit, added on top of the fixed
+  // facing rotation each robot is built with. 0 = as originally posed.
+  bodyYaw: number;
   footPitch: number; // ankle dorsiflexion(+)/plantarflexion(-), degrees, applied to both feet
   hipFlexion: number; // degrees, applied symmetrically to both hips
   kneeFlexion: number; // degrees, applied symmetrically to both knees
@@ -56,6 +60,7 @@ export const DEFAULT_JOINT_ANGLES: JointAngles = {
   pinkyCurl: 0.8,
   torsoPitch: 0,
   torsoYaw: -10,
+  bodyYaw: 0,
   footPitch: 0,
   hipFlexion: 0,
   kneeFlexion: 0,

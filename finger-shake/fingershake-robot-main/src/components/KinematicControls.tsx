@@ -544,6 +544,22 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
           </div>
         ))}
 
+        {/* Body Yaw — rotates the whole robot (root group), not just the torso */}
+        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
+          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
+            <span>Body Yaw</span>
+            <span className="font-mono text-[#3B82F6] font-bold">{activeAngles.bodyYaw}°</span>
+          </div>
+          <input
+            type="range"
+            min="-180"
+            max="180"
+            value={activeAngles.bodyYaw}
+            onChange={(e) => handleChange('bodyYaw', Number(e.target.value))}
+            className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
+          />
+        </div>
+
         {/* Torso Yaw */}
         <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
           <div className="flex justify-between text-[#888] mb-1 text-[11px]">
