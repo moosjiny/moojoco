@@ -7,6 +7,9 @@ import { KinematicControls } from './components/KinematicControls';
 import { CameraPreset, DEFAULT_JOINT_ANGLES, HandshakeMode, JointAngles, MujocoBridgeStatus, RobotTheme, TelemetryData } from './types';
 
 const MANUAL_POSE_STORAGE_KEY = 'fingershake_manual_pose_v1';
+// Stable empty-array reference so KinematicControls' highlight effect doesn't
+// see a "new" keys array (and re-run) on every render when nothing is selected.
+const EMPTY_HIGHLIGHT_KEYS: (keyof JointAngles)[] = [];
 
 function loadStoredManualPose(): { alpha: JointAngles; beta: JointAngles } | null {
   try {
@@ -66,6 +69,13 @@ export default function App() {
   const [mujocoLive, setMujocoLive] = useState<boolean>(false);
   const [mujocoStatus, setMujocoStatus] = useState<MujocoBridgeStatus>('disconnected');
 
+  // Click-to-inspect joint gizmo (RobotScene) -> selects/scrolls to the
+  // matching slider(s) in KinematicControls. null when nothing is selected.
+  const [jointHighlight, setJointHighlight] = useState<{
+    robot: 'alpha' | 'beta';
+    keys: (keyof JointAngles)[];
+  } | null>(null);
+
   const [telemetry, setTelemetry] = useState<TelemetryData>({
     contactDistance: 12,
     gripForce: 65,
@@ -114,6 +124,7 @@ export default function App() {
           mujocoLive={mujocoLive}
           onMujocoStatusChange={setMujocoStatus}
           onTelemetryUpdate={setTelemetry}
+          onJointSelect={setJointHighlight}
         />
       </main>
 
@@ -134,6 +145,8 @@ export default function App() {
           mujocoLive={mujocoLive}
           setMujocoLive={setMujocoLive}
           mujocoStatus={mujocoStatus}
+          highlightRobot={jointHighlight?.robot ?? null}
+          highlightKeys={jointHighlight?.keys ?? EMPTY_HIGHLIGHT_KEYS}
         />
       )}
 

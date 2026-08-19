@@ -42,6 +42,129 @@ function loadPanelLayout(): PanelLayout | null {
   return null;
 }
 
+// A slider row with a draggable range plus a directly-editable number box.
+// The number box keeps its own local text state and only commits (clamped)
+// on blur/Enter, so mid-typing states like "-" or "12" while aiming for
+// "-120" aren't fought by a controlled re-render on every keystroke.
+interface SliderRowProps {
+  sliderKey: keyof JointAngles;
+  label: string;
+  min: number;
+  max: number;
+  step?: number;
+  format?: 'deg' | 'percent';
+  value: number;
+  onChange: (key: keyof JointAngles, val: number) => void;
+  highlighted: boolean;
+  registerRef: (key: keyof JointAngles, el: HTMLDivElement | null) => void;
+}
+
+const SliderRow: React.FC<SliderRowProps> = ({
+  sliderKey,
+  label,
+  min,
+  max,
+  step,
+  format = 'deg',
+  value,
+  onChange,
+  highlighted,
+  registerRef,
+}) => {
+  const toDisplay = (v: number) => (format === 'percent' ? Math.round(v * 100) : Math.round(v));
+  const fromDisplay = (v: number) => (format === 'percent' ? v / 100 : v);
+  const [text, setText] = useState<string>(String(toDisplay(value)));
+
+  useEffect(() => {
+    setText(String(toDisplay(value)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, format]);
+
+  const commit = () => {
+    const n = Number(text);
+    if (Number.isNaN(n)) {
+      setText(String(toDisplay(value)));
+      return;
+    }
+    const clampedDisplay = Math.min(toDisplay(max), Math.max(toDisplay(min), n));
+    setText(String(clampedDisplay));
+    onChange(sliderKey, fromDisplay(clampedDisplay));
+  };
+
+  const accent = format === 'percent' ? '#F59E0B' : '#3B82F6';
+
+  return (
+    <div
+      ref={(el) => registerRef(sliderKey, el)}
+      className={`p-1.5 rounded border transition-colors ${
+        highlighted ? 'bg-[#132038] border-[#3B82F6] ring-1 ring-[#3B82F6]' : 'bg-[#111113] border-[#1A1A1A]'
+      }`}
+    >
+      <div className="flex justify-between items-center text-[#888] mb-0.5 text-[11px] gap-2">
+        <span className="truncate">{label}</span>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <input
+            type="number"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            }}
+            className="w-12 bg-[#0A0A0B] border border-[#222226] rounded px-1 py-0.5 text-right font-mono font-bold text-[11px] focus:outline-none focus:border-[#3B82F6]"
+            style={{ color: accent }}
+          />
+          <span className="text-[#666]">{format === 'percent' ? '%' : '°'}</span>
+        </div>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(sliderKey, Number(e.target.value))}
+        className="w-full rounded h-1 cursor-pointer bg-[#222226]"
+        style={{ accentColor: accent }}
+      />
+    </div>
+  );
+};
+
+const ARM_SLIDERS: [keyof JointAngles, string, number, number][] = [
+  ['shoulderPitch', 'Shoulder Pitch', -120, 30],
+  ['shoulderYaw', 'Shoulder Yaw', -60, 60],
+  ['shoulderRoll', 'Shoulder Roll', -180, 180],
+  ['elbowFlexion', 'Elbow Flexion', 0, 120],
+  ['wristPitch', 'Wrist Pitch', -45, 45],
+  ['wristRoll', 'Wrist Roll', -180, 180],
+  ['wristYaw', 'Wrist Yaw', -90, 90],
+];
+
+const CURL_SLIDERS: [keyof JointAngles, string][] = [
+  ['thumbCurl', 'Thumb Curl'],
+  ['indexCurl', 'Index Curl'],
+  ['middleCurl', 'Middle Curl'],
+  ['ringCurl', 'Ring Curl'],
+  ['pinkyCurl', 'Pinky Curl'],
+];
+
+const BODY_SLIDERS: [keyof JointAngles, string, number, number][] = [
+  ['bodyYaw', 'Body Yaw', -180, 180],
+  ['torsoYaw', 'Torso Yaw', -180, 180],
+  ['torsoPitch', 'Torso Pitch', -30, 30],
+  ['footPitch', 'Foot Angle', -45, 45],
+  ['hipFlexion', 'Hip Flexion', -45, 90],
+  ['kneeFlexion', 'Knee Flexion', 0, 120],
+];
+
+const LEFT_ARM_SLIDERS: [keyof JointAngles, string, number, number][] = [
+  ['leftShoulderPitch', 'Left Shoulder Pitch', -120, 30],
+  ['leftShoulderYaw', 'Left Shoulder Yaw', -60, 60],
+  ['leftShoulderRoll', 'Left Shoulder Roll', -180, 180],
+  ['leftElbowFlexion', 'Left Elbow Flexion', 0, 120],
+];
+
 interface KinematicControlsProps {
   anglesAlpha: JointAngles;
   setAnglesAlpha: React.Dispatch<React.SetStateAction<JointAngles>>;
@@ -54,6 +177,11 @@ interface KinematicControlsProps {
   mujocoLive: boolean;
   setMujocoLive: React.Dispatch<React.SetStateAction<boolean>>;
   mujocoStatus: MujocoBridgeStatus;
+  // Set when a joint gizmo is clicked in the 3D view (see RobotScene.tsx
+  // onJointSelect) — switches to that robot's tab and highlights/scrolls to
+  // the slider(s) that actually drive the clicked joint.
+  highlightRobot: 'alpha' | 'beta' | null;
+  highlightKeys: (keyof JointAngles)[];
 }
 
 export const KinematicControls: React.FC<KinematicControlsProps> = ({
@@ -68,8 +196,24 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
   mujocoLive,
   setMujocoLive,
   mujocoStatus,
+  highlightRobot,
+  highlightKeys,
 }) => {
   const [activeTab, setActiveTab] = useState<'alpha' | 'beta'>('alpha');
+  const sliderRefs = useRef<Partial<Record<keyof JointAngles, HTMLDivElement>>>({});
+  const registerSliderRef = (key: keyof JointAngles, el: HTMLDivElement | null) => {
+    if (el) sliderRefs.current[key] = el;
+    else delete sliderRefs.current[key];
+  };
+
+  // A joint clicked in 3D selects its robot's tab and scrolls its slider(s)
+  // into view, so "click the joint, see the slider" works without hunting.
+  useEffect(() => {
+    if (!highlightRobot || highlightKeys.length === 0) return;
+    setActiveTab(highlightRobot);
+    const el = sliderRefs.current[highlightKeys[0]];
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightRobot, highlightKeys]);
   const [saveStatus, setSaveStatus] = useState<string>('');
 
   const [panelPos, setPanelPos] = useState<{ x: number; y: number }>(() => {
@@ -400,235 +544,51 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
 
       {/* Sliders */}
       <div
-        className="space-y-2 text-xs overflow-y-auto pr-1 font-mono"
+        className="space-y-1 text-xs overflow-y-auto pr-1 font-mono"
         style={{ maxHeight: sliderAreaHeight }}
       >
-        {/* Shoulder Pitch */}
-        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-            <span>Shoulder Pitch</span>
-            <span className="font-mono text-[#3B82F6] font-bold">{activeAngles.shoulderPitch}°</span>
-          </div>
-          <input
-            type="range"
-            min="-120"
-            max="30"
-            value={activeAngles.shoulderPitch}
-            onChange={(e) => handleChange('shoulderPitch', Number(e.target.value))}
-            className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
+        {ARM_SLIDERS.map(([key, label, min, max]) => (
+          <SliderRow
+            key={key}
+            sliderKey={key}
+            label={label}
+            min={min}
+            max={max}
+            value={activeAngles[key]}
+            onChange={handleChange}
+            highlighted={highlightRobot === activeTab && highlightKeys.includes(key)}
+            registerRef={registerSliderRef}
           />
-        </div>
-
-        {/* Shoulder Yaw */}
-        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-            <span>Shoulder Yaw</span>
-            <span className="font-mono text-[#3B82F6] font-bold">{activeAngles.shoulderYaw}°</span>
-          </div>
-          <input
-            type="range"
-            min="-60"
-            max="60"
-            value={activeAngles.shoulderYaw}
-            onChange={(e) => handleChange('shoulderYaw', Number(e.target.value))}
-            className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
-          />
-        </div>
-
-        {/* Shoulder Roll */}
-        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-            <span>Shoulder Roll</span>
-            <span className="font-mono text-[#3B82F6] font-bold">{activeAngles.shoulderRoll}°</span>
-          </div>
-          <input
-            type="range"
-            min="-180"
-            max="180"
-            value={activeAngles.shoulderRoll}
-            onChange={(e) => handleChange('shoulderRoll', Number(e.target.value))}
-            className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
-          />
-        </div>
-
-        {/* Elbow Flexion */}
-        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-            <span>Elbow Flexion</span>
-            <span className="font-mono text-[#3B82F6] font-bold">{activeAngles.elbowFlexion}°</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="120"
-            value={activeAngles.elbowFlexion}
-            onChange={(e) => handleChange('elbowFlexion', Number(e.target.value))}
-            className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
-          />
-        </div>
-
-        {/* Wrist Pitch */}
-        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-            <span>Wrist Pitch</span>
-            <span className="font-mono text-[#3B82F6] font-bold">{activeAngles.wristPitch}°</span>
-          </div>
-          <input
-            type="range"
-            min="-45"
-            max="45"
-            value={activeAngles.wristPitch}
-            onChange={(e) => handleChange('wristPitch', Number(e.target.value))}
-            className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
-          />
-        </div>
-
-        {/* Wrist Roll */}
-        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-            <span>Wrist Roll</span>
-            <span className="font-mono text-[#3B82F6] font-bold">{activeAngles.wristRoll}°</span>
-          </div>
-          <input
-            type="range"
-            min="-180"
-            max="180"
-            value={activeAngles.wristRoll}
-            onChange={(e) => handleChange('wristRoll', Number(e.target.value))}
-            className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
-          />
-        </div>
-
-        {/* Wrist Yaw */}
-        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-            <span>Wrist Yaw</span>
-            <span className="font-mono text-[#3B82F6] font-bold">{activeAngles.wristYaw}°</span>
-          </div>
-          <input
-            type="range"
-            min="-90"
-            max="90"
-            value={activeAngles.wristYaw}
-            onChange={(e) => handleChange('wristYaw', Number(e.target.value))}
-            className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
-          />
-        </div>
-
-        {/* Independent Finger Curls */}
-        {(
-          [
-            ['thumbCurl', 'Thumb Curl'],
-            ['indexCurl', 'Index Curl'],
-            ['middleCurl', 'Middle Curl'],
-            ['ringCurl', 'Ring Curl'],
-            ['pinkyCurl', 'Pinky Curl'],
-          ] as [keyof JointAngles, string][]
-        ).map(([key, label]) => (
-          <div key={key} className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-            <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-              <span>{label}</span>
-              <span className="font-mono text-[#F59E0B] font-bold">
-                {Math.round(activeAngles[key] * 100)}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={activeAngles[key]}
-              onChange={(e) => handleChange(key, Number(e.target.value))}
-              className="w-full accent-[#F59E0B] bg-[#222226] rounded h-1 cursor-pointer"
-            />
-          </div>
         ))}
 
-        {/* Body Yaw — rotates the whole robot (root group), not just the torso */}
-        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-            <span>Body Yaw</span>
-            <span className="font-mono text-[#3B82F6] font-bold">{activeAngles.bodyYaw}°</span>
-          </div>
-          <input
-            type="range"
-            min="-180"
-            max="180"
-            value={activeAngles.bodyYaw}
-            onChange={(e) => handleChange('bodyYaw', Number(e.target.value))}
-            className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
+        {CURL_SLIDERS.map(([key, label]) => (
+          <SliderRow
+            key={key}
+            sliderKey={key}
+            label={label}
+            min={0}
+            max={1}
+            step={0.05}
+            format="percent"
+            value={activeAngles[key]}
+            onChange={handleChange}
+            highlighted={highlightRobot === activeTab && highlightKeys.includes(key)}
+            registerRef={registerSliderRef}
           />
-        </div>
+        ))}
 
-        {/* Torso Yaw */}
-        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-            <span>Torso Yaw</span>
-            <span className="font-mono text-[#3B82F6] font-bold">{activeAngles.torsoYaw}°</span>
-          </div>
-          <input
-            type="range"
-            min="-180"
-            max="180"
-            value={activeAngles.torsoYaw}
-            onChange={(e) => handleChange('torsoYaw', Number(e.target.value))}
-            className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
+        {BODY_SLIDERS.map(([key, label, min, max]) => (
+          <SliderRow
+            key={key}
+            sliderKey={key}
+            label={label}
+            min={min}
+            max={max}
+            value={activeAngles[key]}
+            onChange={handleChange}
+            highlighted={highlightRobot === activeTab && highlightKeys.includes(key)}
+            registerRef={registerSliderRef}
           />
-        </div>
-
-        {/* Torso Pitch */}
-        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-            <span>Torso Pitch</span>
-            <span className="font-mono text-[#3B82F6] font-bold">{activeAngles.torsoPitch}°</span>
-          </div>
-          <input
-            type="range"
-            min="-30"
-            max="30"
-            value={activeAngles.torsoPitch}
-            onChange={(e) => handleChange('torsoPitch', Number(e.target.value))}
-            className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
-          />
-        </div>
-
-        {/* Foot Angle (Ankle Pitch, both feet) */}
-        <div className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-          <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-            <span>Foot Angle</span>
-            <span className="font-mono text-[#3B82F6] font-bold">{activeAngles.footPitch}°</span>
-          </div>
-          <input
-            type="range"
-            min="-45"
-            max="45"
-            value={activeAngles.footPitch}
-            onChange={(e) => handleChange('footPitch', Number(e.target.value))}
-            className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
-          />
-        </div>
-
-        {/* Hip Flexion & Knee Flexion (both legs, symmetric) */}
-        {(
-          [
-            ['hipFlexion', 'Hip Flexion', -45, 90],
-            ['kneeFlexion', 'Knee Flexion', 0, 120],
-          ] as [keyof JointAngles, string, number, number][]
-        ).map(([key, label, min, max]) => (
-          <div key={key} className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-            <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-              <span>{label}</span>
-              <span className="font-mono text-[#3B82F6] font-bold">{activeAngles[key]}°</span>
-            </div>
-            <input
-              type="range"
-              min={min}
-              max={max}
-              value={activeAngles[key]}
-              onChange={(e) => handleChange(key, Number(e.target.value))}
-              className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
-            />
-          </div>
         ))}
 
         {/* Left Arm — independent, not mirrored from the right arm above */}
@@ -636,28 +596,18 @@ export const KinematicControls: React.FC<KinematicControlsProps> = ({
           Left Arm (independent)
         </div>
 
-        {(
-          [
-            ['leftShoulderPitch', 'Left Shoulder Pitch', -120, 30],
-            ['leftShoulderYaw', 'Left Shoulder Yaw', -60, 60],
-            ['leftShoulderRoll', 'Left Shoulder Roll', -180, 180],
-            ['leftElbowFlexion', 'Left Elbow Flexion', 0, 120],
-          ] as [keyof JointAngles, string, number, number][]
-        ).map(([key, label, min, max]) => (
-          <div key={key} className="p-2 bg-[#111113] rounded border border-[#1A1A1A]">
-            <div className="flex justify-between text-[#888] mb-1 text-[11px]">
-              <span>{label}</span>
-              <span className="font-mono text-[#3B82F6] font-bold">{activeAngles[key]}°</span>
-            </div>
-            <input
-              type="range"
-              min={min}
-              max={max}
-              value={activeAngles[key]}
-              onChange={(e) => handleChange(key, Number(e.target.value))}
-              className="w-full accent-[#3B82F6] bg-[#222226] rounded h-1 cursor-pointer"
-            />
-          </div>
+        {LEFT_ARM_SLIDERS.map(([key, label, min, max]) => (
+          <SliderRow
+            key={key}
+            sliderKey={key}
+            label={label}
+            min={min}
+            max={max}
+            value={activeAngles[key]}
+            onChange={handleChange}
+            highlighted={highlightRobot === activeTab && highlightKeys.includes(key)}
+            registerRef={registerSliderRef}
+          />
         ))}
       </div>
     </div>

@@ -22,6 +22,10 @@ interface RobotSceneProps {
   mujocoLive: boolean;
   onMujocoStatusChange?: (status: MujocoBridgeStatus) => void;
   onTelemetryUpdate: (data: TelemetryData) => void;
+  // Fired when a joint marker is clicked (see markJoint in RobotBuilder.ts) so
+  // KinematicControls can switch to the right robot tab and highlight/scroll
+  // to the slider(s) that actually drive it. Fired with null on deselect.
+  onJointSelect?: (selection: { robot: 'alpha' | 'beta'; keys: (keyof JointAngles)[] } | null) => void;
 }
 
 // Option B (MuJoCo backend) frontend integration — Alpha's right arm only.
@@ -397,6 +401,7 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
   mujocoLive,
   onMujocoStatusChange,
   onTelemetryUpdate,
+  onJointSelect,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -631,16 +636,30 @@ export const RobotScene: React.FC<RobotSceneProps> = ({
 
       const wasSameJoint = jointHit && jointHit.object === selectedJointMeshRef.current;
       clearJointGizmo();
-      if (!jointHit || wasSameJoint) return;
+      if (!jointHit || wasSameJoint) {
+        onJointSelect?.(null);
+        return;
+      }
 
       const group = jointHit.object.userData.jointGroup as THREE.Object3D;
       const axes = jointHit.object.userData.jointAxes as JointAxis[];
+      const sliderKeys = jointHit.object.userData.sliderKeys as Partial<Record<JointAxis, keyof JointAngles>>;
       const label = jointHit.object.userData.jointLabel as string;
       const gizmo = createJointGizmo(axes);
       group.add(gizmo);
       selectedJointGizmoRef.current = gizmo;
       selectedJointMeshRef.current = jointHit.object;
       setSelectedJointLabel(label);
+
+      // Walk up to the robot's root group (named "robot_alpha"/"robot_beta" in
+      // RobotBuilder.ts) to know which tab KinematicControls should switch to.
+      let robotId: 'alpha' | 'beta' | null = null;
+      for (let p: THREE.Object3D | null = group; p; p = p.parent) {
+        if (p.name === 'robot_alpha') { robotId = 'alpha'; break; }
+        if (p.name === 'robot_beta') { robotId = 'beta'; break; }
+      }
+      const keys = Object.values(sliderKeys) as (keyof JointAngles)[];
+      onJointSelect?.(robotId && keys.length ? { robot: robotId, keys } : null);
     };
     renderer.domElement.addEventListener('click', handleJointClick);
 
