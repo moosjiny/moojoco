@@ -48,7 +48,7 @@ MANIFEST_PATH = "/home/moos/dev_ws/dual_arms/data/procedural_curl_dataset_unifie
 OUT_DIR = "/home/moos/dev_ws/dual_arms/data/lerobot_stage2_act_policy_holdout"
 REPORT_PATH = "/home/moos/dev_ws/dual_arms/data/lerobot_stage2_act_policy_holdout/validation_report.json"
 
-OBS_DIM = 15
+OBS_DIM = 16
 ACTION_DIM = 12
 CHUNK_SIZE = 20
 BATCH_SIZE = 64
@@ -192,8 +192,14 @@ def closed_loop_rollout(policy, device, ep):
                 if d < obstacle_prox:
                     obstacle_prox = d
 
+        # [[2026-08-20-moojoco-lerobot-schema-redesign]] 반영 — a/b_progress
+        # 자리에 시계 신호 하나 + 실측 qpos 비율 두 개(총 3차원)를 넣는다.
+        qa = data.qpos[model.jnt_qposadr[jid["handA_approach"]]]
+        qb = data.qpos[model.jnt_qposadr[jid["handB_approach"]]]
+        a_qpos_frac = float(np.clip((qa - sim.A_START) / (a_end - sim.A_START), 0.0, 1.0))
+        b_qpos_frac = float(np.clip((qb - sim.B_START) / (b_end - sim.B_START), 0.0, 1.0))
         prox_vec = [finger_proximity[(h, fn)] for h in ("handA", "handB") for fn in sim.FINGER_JOINTS]
-        obs = [sim.ease(t_frac), sim.ease(t_frac)] + prox_vec + [lateral_offset, height_offset, obstacle_prox]
+        obs = [sim.ease(t_frac), a_qpos_frac, b_qpos_frac] + prox_vec + [lateral_offset, height_offset, obstacle_prox]
         obs_t = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
         batch = {OBS_STATE: obs_t, OBS_ENV_STATE: obs_t}
 

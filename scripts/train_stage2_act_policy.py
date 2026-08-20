@@ -1,5 +1,13 @@
-"""Stage 2 (LeRobot/ACT Phase 2 계획) — 통합 데이터셋(76 에피소드, 15차원 관찰/
+"""Stage 2 (LeRobot/ACT Phase 2 계획) — 통합 데이터셋(132 에피소드, 16차원 관찰/
 12차원 행동)으로 소규모 ACT 정책을 학습한다.
+
+## v2 — 스키마 재설계 반영
+[[2026-08-20-moojoco-lerobot-schema-redesign]]에서 관찰-행동 항등함수 지름길
+버그(a/b_progress가 그 프레임 행동과 항상 같은 값이던 문제, Aegis 독립
+재현으로 확인)를 고치며 관찰이 15→16차원으로 바뀌었다: `a_progress`/
+`b_progress`(행동 복제값) 대신 `elapsed_time_frac`(정책 출력과 무관한
+시계 신호) + `handA/B_qpos_frac`(실측 물리 위치, 행동과 인과관계가 다름)
+3차원을 쓴다.
 
 ## 스코프 축소 — 정직하게 기록
 - lerobot의 공식 `LeRobotDataset`/훈련 CLI(`lerobot-train` 등)는 HF Hub 저장소
@@ -17,8 +25,9 @@
   게이트를 통과한 궤적(48/76)의 행동만 모방학습 대상으로 쓴다. 실패 궤적의
   관찰을 안전-경계 분류기로 재사용하는 건 이번 스코프에 넣지 않았다(다음 단계).
 
-관찰(observation.environment_state, 15차원) = a_progress, b_progress,
-  손가락별(양손×5) 근접도, handB lateral/height 오프셋, 장애물 근접도
+관찰(observation.environment_state, 16차원) = elapsed_time_frac,
+  handA/B_qpos_frac, 손가락별(양손×5) 근접도, handB lateral/height 오프셋,
+  장애물 근접도
 행동(action, 12차원) = handA/B 접근 사용비율 + 손가락별(양손×5) curl 사용비율
 """
 import json
@@ -39,7 +48,7 @@ DATA_DIR = "/home/moos/dev_ws/dual_arms/data/procedural_curl_dataset_unified"
 MANIFEST_PATH = os.path.join(DATA_DIR, "manifest.json")
 OUT_DIR = "/home/moos/dev_ws/dual_arms/data/lerobot_stage2_act_policy"
 
-OBS_DIM = 15
+OBS_DIM = 16
 ACTION_DIM = 12
 CHUNK_SIZE = 20
 BATCH_SIZE = 64
