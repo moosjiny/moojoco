@@ -68,8 +68,11 @@ def run_sweep(model, data, jid, aid, geom_id, hand_geoms, obstacle_geom, obstacl
     a_end = core.A_END_BASELINE
     b_end = core.B_END_BASELINE
     total_s = 4.0
-    LATERAL_OFFSETS = [-0.015, -0.0075, 0.0, 0.0075, 0.015]
-    HEIGHT_OFFSETS = [-0.015, -0.0075, 0.0, 0.0075, 0.015]
+    # [[2026-08-20-moojoco-lerobot-stage2-holdout-validation]]에서 5x5(25개)로는
+    # 이 축의 비단조성(중간 오프셋이 제일 위험, 큰 오프셋은 오히려 안전)을
+    # 학습하기에 데이터가 너무 적었다고 판단해 9x9(81개)로 촘촘히 재수집한다.
+    LATERAL_OFFSETS = [round(-0.015 + i * 0.00375, 5) for i in range(9)]
+    HEIGHT_OFFSETS = [round(-0.015 + i * 0.00375, 5) for i in range(9)]
     for lat, hei in itertools.product(LATERAL_OFFSETS, HEIGHT_OFFSETS):
         rows, worst_ratio, final_approach = core.run_episode(
             model, data, jid, aid, geom_id, hand_geoms, obstacle_geom, obstacle_mocap_id,

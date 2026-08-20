@@ -211,7 +211,12 @@ def run_episode(model, data, jid, aid, geom_id, hand_geoms, obstacle_geom, obsta
             for fn in FINGER_JOINTS:
                 prox_vec.append(float(finger_proximity[(hand, fn)]))
                 finger_action_vec.append(float(use_frac_state[(hand, fn)]))
-        obs = [float(ease(t_frac)), float(ease(t_frac))] + prox_vec + [
+        # a_progress/b_progress는 시간 신호 ease(t_frac)이 아니라 실제 손목
+        # 진행률(approach_state)을 넣는다 — [[2026-08-20-moojoco-lerobot-
+        # stage2-holdout-validation]]에서 시간 신호를 썼더니 장애물 감속이
+        # 걸려 실제 위치가 시간보다 뒤처지는 상황을 정책이 전혀 구분 못 하는
+        # 결함으로 확인됐다.
+        obs = [float(approach_state["handA"]), float(approach_state["handB"])] + prox_vec + [
             float(lateral_offset), float(height_offset), float(obstacle_prox)
         ]
         action_vec = [float(approach_state["handA"]), float(approach_state["handB"])] + finger_action_vec
