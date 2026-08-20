@@ -11,6 +11,17 @@
 성공 기준은 지금까지와 동일: 침투량이 캡슐 반경의 5% 이내(Hermes 검증
 게이트). GIF는 참고용 시각자료일 뿐, 판정은 항상 `contact.dist` 실측으로
 한다.
+
+## v2 정정 — 최초 버전의 "5/5 통과"는 퇴화 해법이었다
+최초 버전은 a/b_progress 관찰에 "정책이 직전 프레임에 낸 예측"을 그대로
+되먹였다. 그 결과 손목이 시작 위치에서 전혀 움직이지 않고 손가락도 전혀
+오므라들지 않는(악수 자체를 시도하지 않는) 채로 "침투 0"을 보고했다 —
+Stage 4 스트레스 테스트(`stage4_stress_test_policy.py`)에서 발견했다.
+학습 데이터의 모든 프레임에서 `observation.state[0:2]`가 그 프레임의
+`action[0:2]`와 항상 같은 값이라, 정책이 "obs=0이면 action=0"이라는 지름길을
+배웠기 때문이다. 이 버전은 그 자리에 경과시간 신호(`sim.ease(t_frac)`)를
+넣어 그 고정점을 강제로 벗어나게 고쳤다. 상세: [[2026-08-20-moojoco-lerobot-
+stage3-live-integration]] v2.
 """
 import os
 os.environ["MUJOCO_GL"] = "egl"
@@ -88,7 +99,6 @@ def run_live_episode(policy, device, cond, renderer, cam, model, data, jid, aid,
 
     worst_dist = 0.0
     frames = []
-    approach_state = {"handA": 0.0, "handB": 0.0}
 
     for f in range(n_total):
         t_frac = f / max(n_total - 1, 1)
@@ -118,13 +128,18 @@ def run_live_episode(policy, device, cond, renderer, cam, model, data, jid, aid,
                     obstacle_prox = d
 
         # 실시간 추론 — 매 프레임 현재 물리 상태를 관찰로 조립해 정책에 넣는다.
-        # 학습 때와 동일하게 a/b_progress는 approach_state를 넣어야 하는데,
-        # 여기서는 그 값을 정책이 이전 프레임에 낸 예측 자체로 대체한다 —
-        # 실제 배치 환경에서는 로봇의 실제 인코더 위치를 읽으면 되지만, 이
-        # 데모에서는 물리 자체가 정책 예측을 그대로 따라가므로 두 값이
-        # 사실상 같다(핸드가 목표를 못 쫓아가는 큰 오차가 없다면).
+        # ⚠️ 처음엔 여기에 "정책이 직전 프레임에 낸 예측 자체"를 a/b_progress로
+        # 되먹였는데, 그러면 손이 시작 위치에서 단 1mm도 안 움직이는 채로
+        # "침투 0"을 내는 퇴화 해법에 빠진다는 걸 Stage 4 스트레스 테스트에서
+        # 발견했다([[2026-08-20-moojoco-lerobot-stage3-live-integration]] v2
+        # 정정 참고) — 학습 데이터의 모든 프레임에서 observation.state[0:2]가
+        # 그 프레임의 action[0:2]와 항상 같아서, 정책이 "obs=0이면 action=0"
+        # 이라는 지름길을 배웠고, obs를 0에서 시작해 자기예측으로 되먹이면 그
+        # 고정점에 영원히 갇힌다. 정책의 출력과 무관하게 항상 전진하는 경과
+        # 시간 신호(sim.ease(t_frac), Stage 2 검증과 동일)로 바꿔 이 고정점을
+        # 강제로 벗어나게 했다.
         prox_vec = [finger_proximity[(h, fn)] for h in ("handA", "handB") for fn in sim.FINGER_JOINTS]
-        obs = [approach_state["handA"], approach_state["handB"]] + prox_vec + [
+        obs = [sim.ease(t_frac), sim.ease(t_frac)] + prox_vec + [
             lateral_offset, height_offset, obstacle_prox
         ]
         obs_t = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
@@ -134,7 +149,6 @@ def run_live_episode(policy, device, cond, renderer, cam, model, data, jid, aid,
             action_chunk = policy.predict_action_chunk(batch)[0, 0].cpu().numpy()
         action_chunk = np.clip(action_chunk, 0.0, 1.0)
         a_frac, b_frac = float(action_chunk[0]), float(action_chunk[1])
-        approach_state = {"handA": a_frac, "handB": b_frac}
         finger_fracs = {
             (h, fn): float(action_chunk[2 + i])
             for i, (h, fn) in enumerate([(h, fn) for h in ("handA", "handB") for fn in sim.FINGER_JOINTS])
