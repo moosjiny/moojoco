@@ -19,8 +19,13 @@
 
 행동(action, 12차원) = [handA_approach_use_frac, handB_approach_use_frac]
                       + Stage 1의 손가락 curl 사용비율 10차원
-관찰(observation.state, 15차원) = Stage 1.5와 동일(변경 없음, 이미
-obstacle_proximity_m을 포함하고 있었다)
+관찰(observation.state, 16차원) — [[2026-08-20-moojoco-lerobot-stage4-stress-
+test]] v2에서 발견된 관찰-행동 항등함수 지름길 버그를 고치며 재설계:
+[elapsed_time_frac, handA_qpos_frac, handB_qpos_frac] + 손가락별(양손×5)
+근접도 10 + [lateral_offset, height_offset, obstacle_proximity]. 앞의 3차원이
+예전엔 "그 프레임 행동의 복제값" 2개(a/b_progress)였는데, 이제는 행동과
+값이 절대 같을 수 없는 두 독립 신호(정책 출력과 무관한 시계 신호 + 물리
+qpos 실측값)로 바뀌었다.
 
 두 서브 스윕을 그대로 재실행해 직접 비교한다:
 - 서브 스윕 A(좌우/상하 오프셋): 장애물이 없는 조건이므로 회귀 확인용 —
@@ -211,12 +216,29 @@ def run_episode(model, data, jid, aid, geom_id, hand_geoms, obstacle_geom, obsta
             for fn in FINGER_JOINTS:
                 prox_vec.append(float(finger_proximity[(hand, fn)]))
                 finger_action_vec.append(float(use_frac_state[(hand, fn)]))
-        # a_progress/b_progress는 시간 신호 ease(t_frac)이 아니라 실제 손목
-        # 진행률(approach_state)을 넣는다 — [[2026-08-20-moojoco-lerobot-
-        # stage2-holdout-validation]]에서 시간 신호를 썼더니 장애물 감속이
-        # 걸려 실제 위치가 시간보다 뒤처지는 상황을 정책이 전혀 구분 못 하는
-        # 결함으로 확인됐다.
-        obs = [float(approach_state["handA"]), float(approach_state["handB"])] + prox_vec + [
+
+        # 관찰-행동 스키마 재설계([[2026-08-20-moojoco-lerobot-stage4-stress-
+        # test]] v2에서 확인된 근본 원인 수정) — 이전엔 a_progress/b_progress에
+        # 그 프레임의 손목 행동(approach_state)을 그대로 복제해서 관찰과 행동이
+        # 완전히 같은 값이었다. 정책이 "obs=x면 action=x" 항등함수 지름길을
+        # 배웠고, 실시간 추론에서 obs를 자기 예측(또는 심지어 진짜 물리
+        # 위치)으로 되먹이면 시작값 0에서 영원히 못 벗어나는 고정점이 됐다.
+        #
+        # 이제 관찰은 행동과 값 자체가 다른, 독립적인 두 신호로 구성한다:
+        #   1. elapsed_time_frac — 정책의 출력·물리 상태 어느 쪽과도 무관하게
+        #      항상 전진하는 순수 시계 신호(ease(t_frac)). 어떤 상황에서도
+        #      고정점에 갇히지 않도록 보장하는 유일한 신호.
+        #   2. handA/B_qpos_frac — "정답 행동"이 아니라 이번 프레임 물리
+        #      스텝이 끝난 뒤 실제로 측정된 손목 위치(qpos)를 목표 구간
+        #      대비 비율로 환산한 값. 실제 로봇의 인코더 값에 해당하며,
+        #      PD 추종이 지연되거나 장애물로 감속될 때는 그 프레임의 목표
+        #      행동(approach_state)과 값이 달라진다 — 더 이상 항등함수가
+        #      아니다.
+        qa = data.qpos[model.jnt_qposadr[jid["handA_approach"]]]
+        qb = data.qpos[model.jnt_qposadr[jid["handB_approach"]]]
+        a_qpos_frac = float(np.clip((qa - A_START) / (a_end - A_START), 0.0, 1.0))
+        b_qpos_frac = float(np.clip((qb - B_START) / (b_end - B_START), 0.0, 1.0))
+        obs = [float(ease(t_frac)), a_qpos_frac, b_qpos_frac] + prox_vec + [
             float(lateral_offset), float(height_offset), float(obstacle_prox)
         ]
         action_vec = [float(approach_state["handA"]), float(approach_state["handB"])] + finger_action_vec
@@ -353,7 +375,7 @@ def main():
         "capsule_radius_m": CAPSULE_RADIUS,
         "penetration_gate_ratio_of_radius": PENETRATION_GATE_RATIO,
         "observation_dims": (
-            ["a_progress", "b_progress"]
+            ["elapsed_time_frac", "handA_qpos_frac", "handB_qpos_frac"]
             + [f"{h}_{fn}_proximity_m" for h in ("handA", "handB") for fn in FINGER_JOINTS]
             + ["handB_lateral_offset_m", "handB_height_offset_m", "obstacle_proximity_m"]
         ),

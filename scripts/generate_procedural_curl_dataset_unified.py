@@ -17,8 +17,13 @@ state += (ease(t) - state) * 1.0 = ease(t)가 정확히 성립해 Stage 1의 원
 
 세 서브 스윕을 전부 이 스크립트 하나에서 실행해 단일 디렉터리에 저장한다:
   - stage1_approach   (45 에피소드, Stage 1과 동일한 그리드)
-  - A_lateral_height  (25 에피소드, Stage 1.5/1.75와 동일)
+  - A_lateral_height  (81 에피소드, 9x9로 재수집)
   - B_obstacle        (6 에피소드, Stage 1.5/1.75와 동일)
+
+관찰 스키마는 `generate_procedural_curl_dataset_stage1_75.py`가 정의한다 —
+[[2026-08-20-moojoco-lerobot-stage4-stress-test]] v2에서 관찰-행동 항등함수
+지름길 버그를 고치며 16차원으로 재설계됐다(§해당 스크립트 상단 docstring
+참고). 이 스크립트는 그 컨트롤러/스키마를 그대로 재사용만 한다.
 """
 import itertools
 import json
@@ -143,7 +148,7 @@ def main():
         "capsule_radius_m": core.CAPSULE_RADIUS,
         "penetration_gate_ratio_of_radius": PENETRATION_GATE_RATIO,
         "observation_dims": (
-            ["a_progress", "b_progress"]
+            ["elapsed_time_frac", "handA_qpos_frac", "handB_qpos_frac"]
             + [f"{h}_{fn}_proximity_m" for h in ("handA", "handB") for fn in core.FINGER_JOINTS]
             + ["handB_lateral_offset_m", "handB_height_offset_m", "obstacle_proximity_m"]
         ),
