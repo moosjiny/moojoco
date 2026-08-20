@@ -181,6 +181,7 @@ export function buildBipedalRobot(
   reactorMesh.rotation.x = Math.PI / 2;
   reactorMesh.position.set(0, 0.35, 0.19);
   torsoGroup.add(reactorMesh);
+  markJoint(torsoGroup, { y: 'torsoYaw', x: 'torsoPitch' }, '허리 (Torso Yaw/Pitch)');
 
   const chestLight = new THREE.PointLight(colors.chest, 1.2, 2.5);
   chestLight.position.set(0, 0.35, 0.25);
@@ -201,6 +202,7 @@ export function buildBipedalRobot(
   const headGroup = new THREE.Group();
   headGroup.position.set(0, 0.12, 0);
   neckGroup.add(headGroup);
+  markJoint(headGroup, { x: 'headPitch' }, '목 (Head Pitch)');
 
   const headMesh = new THREE.Mesh(
     new THREE.BoxGeometry(0.28, 0.26, 0.28),

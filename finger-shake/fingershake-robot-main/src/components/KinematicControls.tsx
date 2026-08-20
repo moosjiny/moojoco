@@ -153,6 +153,7 @@ const BODY_SLIDERS: [keyof JointAngles, string, number, number][] = [
   ['bodyYaw', 'Body Yaw', -180, 180],
   ['torsoYaw', 'Torso Yaw', -180, 180],
   ['torsoPitch', 'Torso Pitch', -30, 30],
+  ['headPitch', 'Head Pitch', -30, 30],
   ['footPitch', 'Foot Angle', -45, 45],
   ['hipFlexion', 'Hip Flexion', -45, 90],
   ['kneeFlexion', 'Knee Flexion', 0, 120],

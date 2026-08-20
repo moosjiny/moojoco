@@ -25,6 +25,11 @@ export interface JointAngles {
   pinkyCurl: number;
   torsoPitch: number;
   torsoYaw: number;
+  // Neck/head pitch (nod), degrees. Previously only driven by the automatic
+  // handshake animation (a small sinusoidal bob) with no manual slider or
+  // click gizmo — the head joint was uncontrollable and unclickable in
+  // manual mode. Same axis (rotation.x) as the animation uses.
+  headPitch: number;
   // Whole-robot yaw offset (root group, degrees) — rotates the entire robot
   // (torso, arms, legs, base) as a rigid unit, added on top of the fixed
   // facing rotation each robot is built with. 0 = as originally posed.
@@ -60,6 +65,7 @@ export const DEFAULT_JOINT_ANGLES: JointAngles = {
   pinkyCurl: 0.8,
   torsoPitch: 0,
   torsoYaw: -10,
+  headPitch: 0,
   // 19deg makes Alpha and Beta face each other symmetrically — found by
   // computing the angle from each robot's root position to the other's, then
   // confirmed visually (see thesis 2026-08-20-moojoco-body-yaw-slider-feature).
