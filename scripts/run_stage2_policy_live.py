@@ -127,19 +127,16 @@ def run_live_episode(policy, device, cond, renderer, cam, model, data, jid, aid,
                 if d < obstacle_prox:
                     obstacle_prox = d
 
-        # 실시간 추론 — 매 프레임 현재 물리 상태를 관찰로 조립해 정책에 넣는다.
-        # ⚠️ 처음엔 여기에 "정책이 직전 프레임에 낸 예측 자체"를 a/b_progress로
-        # 되먹였는데, 그러면 손이 시작 위치에서 단 1mm도 안 움직이는 채로
-        # "침투 0"을 내는 퇴화 해법에 빠진다는 걸 Stage 4 스트레스 테스트에서
-        # 발견했다([[2026-08-20-moojoco-lerobot-stage3-live-integration]] v2
-        # 정정 참고) — 학습 데이터의 모든 프레임에서 observation.state[0:2]가
-        # 그 프레임의 action[0:2]와 항상 같아서, 정책이 "obs=0이면 action=0"
-        # 이라는 지름길을 배웠고, obs를 0에서 시작해 자기예측으로 되먹이면 그
-        # 고정점에 영원히 갇힌다. 정책의 출력과 무관하게 항상 전진하는 경과
-        # 시간 신호(sim.ease(t_frac), Stage 2 검증과 동일)로 바꿔 이 고정점을
-        # 강제로 벗어나게 했다.
+        # [[2026-08-20-moojoco-lerobot-schema-redesign]] 반영 — 16차원 스키마:
+        # elapsed_time_frac(시계 신호, 고정점 방지) + handA/B_qpos_frac(실측
+        # 물리 위치). 이전엔 여기서 15차원(시계신호 2회 복제)을 썼는데, 그
+        # 이전엔 자기예측 되먹임으로 퇴화 고정점에 빠졌었다(§v2 thesis 참고).
+        qa = data.qpos[model.jnt_qposadr[jid["handA_approach"]]]
+        qb = data.qpos[model.jnt_qposadr[jid["handB_approach"]]]
+        a_qpos_frac = float(np.clip((qa - sim.A_START) / (a_end - sim.A_START), 0.0, 1.0))
+        b_qpos_frac = float(np.clip((qb - sim.B_START) / (b_end - sim.B_START), 0.0, 1.0))
         prox_vec = [finger_proximity[(h, fn)] for h in ("handA", "handB") for fn in sim.FINGER_JOINTS]
-        obs = [sim.ease(t_frac), sim.ease(t_frac)] + prox_vec + [
+        obs = [sim.ease(t_frac), a_qpos_frac, b_qpos_frac] + prox_vec + [
             lateral_offset, height_offset, obstacle_prox
         ]
         obs_t = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)

@@ -41,7 +41,12 @@ REPORT_PATH = "/home/moos/dev_ws/dual_arms/data/stage4_stress_test_report.json"
 N_IN_RANGE = 40
 N_BEYOND_RANGE = 10  # 학습 그리드 경계 바로 바깥 — 일부러 실패를 유도해 한계를 기록
 
-random.seed(20260821)
+# 다중 시드 — [[2026-08-20-moojoco-lerobot-stage4-stress-test]] v2에서 Aegis가
+# 단일 시드(20260821, 46%) 발표치를 3시드 평균(32%)으로 REJECTED 판정한 교훈을
+# 반영해, 이번엔 처음부터 여러 시드로 돌리고 시드별 결과와 평균을 함께
+# 보고한다. Aegis가 쓴 시드 중 하나(20260820)를 포함시켜 교차 비교도 가능하게
+# 했다.
+SEEDS = [20260821, 20260820, 555555]
 
 
 def sample_condition(beyond=False):
@@ -112,13 +117,15 @@ def run_episode(policy, device, cond, model, data, jid, aid, geom_id, hand_geoms
                 if d < obstacle_prox:
                     obstacle_prox = d
 
-        # a_progress/b_progress: 실제 물리 위치도, 정책 자신의 이전 예측도
-        # 아니라 경과시간 신호 sim.ease(t_frac)을 쓴다 — §스크립트 상단 docstring
-        # 참고, 둘 다 시도했으나 모두 obs[0:2]==그 프레임 action[0:2]인 학습
-        # 데이터 특성 때문에 "가만히 있기"라는 퇴화 고정점에 갇혔다. 시계 신호는
-        # 정책의 출력과 무관하게 항상 전진하므로 그 고정점을 강제로 벗어난다.
+        # [[2026-08-20-moojoco-lerobot-schema-redesign]] 반영 — 16차원 스키마:
+        # elapsed_time_frac(시계 신호, 고정점 방지) + handA/B_qpos_frac(실측
+        # 물리 위치, 행동과 인과관계가 다름).
+        qa = data.qpos[model.jnt_qposadr[jid["handA_approach"]]]
+        qb = data.qpos[model.jnt_qposadr[jid["handB_approach"]]]
+        a_qpos_frac = float(np.clip((qa - sim.A_START) / (a_end - sim.A_START), 0.0, 1.0))
+        b_qpos_frac = float(np.clip((qb - sim.B_START) / (b_end - sim.B_START), 0.0, 1.0))
         prox_vec = [finger_proximity[(h, fn)] for h in ("handA", "handB") for fn in sim.FINGER_JOINTS]
-        obs = [sim.ease(t_frac), sim.ease(t_frac)] + prox_vec + [
+        obs = [sim.ease(t_frac), a_qpos_frac, b_qpos_frac] + prox_vec + [
             lateral_offset, height_offset, obstacle_prox
         ]
         obs_t = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
@@ -178,58 +185,79 @@ def main():
 
     model, data, jid, aid, geom_id, hand_geoms, obstacle_geom, obstacle_mocap_id = sim.build_model()
 
-    conditions = [sample_condition(beyond=False) for _ in range(N_IN_RANGE)] + \
-                 [sample_condition(beyond=True) for _ in range(N_BEYOND_RANGE)]
-
-    results = []
     t0 = time.time()
-    for i, cond in enumerate(conditions):
-        worst_ratio, max_finger_frac, final_a_frac, final_b_frac = run_episode(
-            policy, device, cond, model, data, jid, aid, geom_id,
-            hand_geoms, obstacle_geom, obstacle_mocap_id,
-        )
-        passed = worst_ratio <= sim.PENETRATION_GATE_RATIO
-        # "안전"이 "손을 아예 안 움직였다"는 뜻이 아니어야 진짜 성공이다 —
-        # Stage 3에서 이 구분을 안 해서 퇴화 해법을 놓쳤다(§docstring 참고).
-        engaged = final_a_frac > 0.5 and final_b_frac > 0.5 and max_finger_frac > 0.3
-        results.append({
-            **cond,
-            "worst_penetration_ratio_of_radius": round(worst_ratio, 4),
-            "passed_5pct_gate": passed,
-            "max_finger_frac": round(max_finger_frac, 3),
-            "final_a_frac": round(final_a_frac, 3),
-            "final_b_frac": round(final_b_frac, 3),
-            "genuinely_engaged": engaged,
+    per_seed = []
+    all_episodes = []
+
+    for seed in SEEDS:
+        random.seed(seed)
+        conditions = [sample_condition(beyond=False) for _ in range(N_IN_RANGE)] + \
+                     [sample_condition(beyond=True) for _ in range(N_BEYOND_RANGE)]
+
+        seed_results = []
+        for i, cond in enumerate(conditions):
+            worst_ratio, max_finger_frac, final_a_frac, final_b_frac = run_episode(
+                policy, device, cond, model, data, jid, aid, geom_id,
+                hand_geoms, obstacle_geom, obstacle_mocap_id,
+            )
+            passed = worst_ratio <= sim.PENETRATION_GATE_RATIO
+            # "안전"이 "손을 아예 안 움직였다"는 뜻이 아니어야 진짜 성공이다 —
+            # Stage 3에서 이 구분을 안 해서 퇴화 해법을 놓쳤다(§docstring 참고).
+            engaged = final_a_frac > 0.5 and final_b_frac > 0.5 and max_finger_frac > 0.3
+            row = {
+                "seed": seed,
+                **cond,
+                "worst_penetration_ratio_of_radius": round(worst_ratio, 4),
+                "passed_5pct_gate": passed,
+                "max_finger_frac": round(max_finger_frac, 3),
+                "final_a_frac": round(final_a_frac, 3),
+                "final_b_frac": round(final_b_frac, 3),
+                "genuinely_engaged": engaged,
+            }
+            seed_results.append(row)
+            all_episodes.append(row)
+            tag = "BEYOND" if cond["beyond_trained_range"] else "in-range"
+            print(f"[seed={seed}][{i:3d}][{tag}] worst_ratio={worst_ratio:.4f} "
+                  f"final_a/b={final_a_frac:.2f}/{final_b_frac:.2f} max_finger={max_finger_frac:.2f} "
+                  f"{'PASS' if passed else 'FAIL'} {'ENGAGED' if engaged else 'NO-OP!'}", flush=True)
+
+        in_range = [r for r in seed_results if not r["beyond_trained_range"]]
+        beyond = [r for r in seed_results if r["beyond_trained_range"]]
+        n_pass_in_range = sum(1 for r in in_range if r["passed_5pct_gate"])
+        n_pass_beyond = sum(1 for r in beyond if r["passed_5pct_gate"])
+        n_engaged = sum(1 for r in seed_results if r["genuinely_engaged"])
+        overall_pct = 100.0 * (n_pass_in_range + n_pass_beyond) / len(seed_results)
+        per_seed.append({
+            "seed": seed,
+            "n_in_range": len(in_range), "n_passed_in_range": n_pass_in_range,
+            "n_beyond_range": len(beyond), "n_passed_beyond_range": n_pass_beyond,
+            "n_engaged": n_engaged, "n_total": len(seed_results),
+            "overall_pass_pct": round(overall_pct, 1),
         })
-        tag = "BEYOND" if cond["beyond_trained_range"] else "in-range"
-        print(f"[{i:3d}][{tag}] worst_ratio={worst_ratio:.4f} final_a/b={final_a_frac:.2f}/{final_b_frac:.2f} "
-              f"max_finger={max_finger_frac:.2f} {'PASS' if passed else 'FAIL'} "
-              f"{'ENGAGED' if engaged else 'NO-OP!'}", flush=True)
+        print(f"--- seed {seed}: 범위내 {n_pass_in_range}/{len(in_range)}, "
+              f"범위밖 {n_pass_beyond}/{len(beyond)}, 전체 {overall_pct:.1f}% ---\n", flush=True)
 
     elapsed = time.time() - t0
-    in_range = [r for r in results if not r["beyond_trained_range"]]
-    beyond = [r for r in results if r["beyond_trained_range"]]
-    n_pass_in_range = sum(1 for r in in_range if r["passed_5pct_gate"])
-    n_pass_beyond = sum(1 for r in beyond if r["passed_5pct_gate"])
-    n_engaged = sum(1 for r in results if r["genuinely_engaged"])
+    ensemble_avg = round(sum(s["overall_pass_pct"] for s in per_seed) / len(per_seed), 1)
+    ensemble_n_engaged = sum(s["n_engaged"] for s in per_seed)
+    ensemble_n_total = sum(s["n_total"] for s in per_seed)
 
     report = {
         "checkpoint_dir": CHECKPOINT_DIR,
-        "n_in_range": len(in_range),
-        "n_passed_in_range": n_pass_in_range,
-        "n_beyond_range": len(beyond),
-        "n_passed_beyond_range": n_pass_beyond,
-        "n_genuinely_engaged": n_engaged,
-        "n_total": len(results),
+        "seeds": SEEDS,
+        "per_seed": per_seed,
+        "ensemble_avg_pass_pct": ensemble_avg,
+        "ensemble_n_genuinely_engaged": ensemble_n_engaged,
+        "ensemble_n_total": ensemble_n_total,
         "elapsed_s": round(elapsed, 2),
-        "episodes": results,
+        "episodes": all_episodes,
     }
     with open(REPORT_PATH, "w") as fp:
         json.dump(report, fp, indent=2)
 
-    print(f"\n학습 범위 내: {n_pass_in_range}/{len(in_range)} 게이트 통과")
-    print(f"학습 범위 밖(경계 outside 1.25x): {n_pass_beyond}/{len(beyond)} 게이트 통과")
-    print(f"실제로 접근·파지를 시도함(퇴화 no-op 아님): {n_engaged}/{len(results)}")
+    print(f"\n시드별 통과율: " + ", ".join(f"{s['seed']}={s['overall_pass_pct']}%" for s in per_seed))
+    print(f"{len(SEEDS)}-시드 평균 통과율: {ensemble_avg}%")
+    print(f"실제로 접근·파지를 시도함(퇴화 no-op 아님): {ensemble_n_engaged}/{ensemble_n_total}")
     print(f"report: {REPORT_PATH}")
 
 
