@@ -1,0 +1,155 @@
+<mujoco model="amazinghand_5finger_docking_v3">
+  <compiler angle="radian" />
+  <option gravity="0 0 -9.81" timestep="0.002" />
+
+  <default>
+    <geom density="600" friction="1.0 0.02 0.001" solref="0.01 1" solimp="0.9 0.95 0.001" />
+    <joint damping="0.15" frictionloss="0.01" />
+  </default>
+
+  <worldbody>
+    <light name="light_top" pos="0 0 1.2" dir="0 0 -1" diffuse="0.8 0.8 0.8" directional="true" />
+    <light name="light_side" pos="0.8 -0.6 0.6" dir="-0.8 0.6 -0.4" diffuse="0.5 0.5 0.5" directional="true" />
+    <camera name="cam_dock" mode="fixed" pos="0.55 -0.55 0.35" xyaxes="0.707 0.707 0 -0.25 0.25 0.935" />
+
+    <geom name="floor" type="plane" size="1 1 0.01" pos="0 0 -0.15" rgba="0.15 0.15 0.18 1" contype="0" conaffinity="0" />
+
+    <body name="obstacle" mocap="true" pos="0 5 0.05">
+      <geom name="obstacle_geom" type="box" size="0.06 0.004 0.05" rgba="0.9 0.25 0.2 0.55" />
+    </body>
+
+    <body name="handA_wrist" pos="0 0 0.05">
+      <joint name="handA_approach" type="slide" axis="0 1 0" damping="1.0" />
+      <inertial pos="0 0 0" mass="0.35" diaginertia="0.0006 0.0006 0.0006" />
+      <geom name="handA_palm" type="box" size="0.024 0.017 0.008" rgba="0.22 0.74 0.97 1" />
+      <body name="handA_finger_thumb" pos="-0.026 0.017 0">
+        <joint name="handA_thumb_mcp" type="hinge" axis="1 0 0" range="0 1.4" />
+        <geom name="handA_thumb_prox_geom" type="capsule" fromto="0 0 0 0 0.0209 0" size="0.006" rgba="0.22 0.74 0.97 1" />
+        <body name="handA_thumb_distal" pos="0 0.0209 0">
+          <joint name="handA_thumb_pip" type="hinge" axis="1 0 0" range="0 1.5" />
+          <geom name="handA_thumb_dist_geom" type="capsule" fromto="0 0 0 0 0.0171 0" size="0.0051" rgba="0.22 0.74 0.97 1" />
+        </body>
+      </body>
+      <body name="handA_finger_index" pos="-0.013 0.017 0">
+        <joint name="handA_index_mcp" type="hinge" axis="1 0 0" range="0 1.4" />
+        <geom name="handA_index_prox_geom" type="capsule" fromto="0 0 0 0 0.0248 0" size="0.006" rgba="0.22 0.74 0.97 1" />
+        <body name="handA_index_distal" pos="0 0.0248 0">
+          <joint name="handA_index_pip" type="hinge" axis="1 0 0" range="0 1.5" />
+          <geom name="handA_index_dist_geom" type="capsule" fromto="0 0 0 0 0.0203 0" size="0.0051" rgba="0.22 0.74 0.97 1" />
+        </body>
+      </body>
+      <body name="handA_finger_middle" pos="0.0 0.017 0">
+        <joint name="handA_middle_mcp" type="hinge" axis="1 0 0" range="0 1.4" />
+        <geom name="handA_middle_prox_geom" type="capsule" fromto="0 0 0 0 0.0264 0" size="0.006" rgba="0.22 0.74 0.97 1" />
+        <body name="handA_middle_distal" pos="0 0.0264 0">
+          <joint name="handA_middle_pip" type="hinge" axis="1 0 0" range="0 1.5" />
+          <geom name="handA_middle_dist_geom" type="capsule" fromto="0 0 0 0 0.0216 0" size="0.0051" rgba="0.22 0.74 0.97 1" />
+        </body>
+      </body>
+      <body name="handA_finger_ring" pos="0.013 0.017 0">
+        <joint name="handA_ring_mcp" type="hinge" axis="1 0 0" range="0 1.4" />
+        <geom name="handA_ring_prox_geom" type="capsule" fromto="0 0 0 0 0.0242 0" size="0.006" rgba="0.22 0.74 0.97 1" />
+        <body name="handA_ring_distal" pos="0 0.0242 0">
+          <joint name="handA_ring_pip" type="hinge" axis="1 0 0" range="0 1.5" />
+          <geom name="handA_ring_dist_geom" type="capsule" fromto="0 0 0 0 0.0198 0" size="0.0051" rgba="0.22 0.74 0.97 1" />
+        </body>
+      </body>
+      <body name="handA_finger_pinky" pos="0.026 0.017 0">
+        <joint name="handA_pinky_mcp" type="hinge" axis="1 0 0" range="0 1.4" />
+        <geom name="handA_pinky_prox_geom" type="capsule" fromto="0 0 0 0 0.0198 0" size="0.006" rgba="0.22 0.74 0.97 1" />
+        <body name="handA_pinky_distal" pos="0 0.0198 0">
+          <joint name="handA_pinky_pip" type="hinge" axis="1 0 0" range="0 1.5" />
+          <geom name="handA_pinky_dist_geom" type="capsule" fromto="0 0 0 0 0.0162 0" size="0.0051" rgba="0.22 0.74 0.97 1" />
+        </body>
+      </body>
+    </body>
+
+    <body name="handB_wrist" pos="0.007 0.12 0.05" euler="0 0 3.14159">
+      <joint name="handB_approach" type="slide" axis="0 1 0" damping="1.0" />
+      <joint name="handB_lateral" type="slide" axis="1 0 0" damping="1.0" />
+      <joint name="handB_height" type="slide" axis="0 0 1" damping="1.0" />
+      <inertial pos="0 0 0" mass="0.35" diaginertia="0.0006 0.0006 0.0006" />
+      <geom name="handB_palm" type="box" size="0.024 0.017 0.008" rgba="0.98 0.57 0.23 1" />
+      <body name="handB_finger_thumb" pos="-0.026 0.017 0">
+        <joint name="handB_thumb_mcp" type="hinge" axis="1 0 0" range="0 1.4" />
+        <geom name="handB_thumb_prox_geom" type="capsule" fromto="0 0 0 0 0.0209 0" size="0.006" rgba="0.98 0.57 0.23 1" />
+        <body name="handB_thumb_distal" pos="0 0.0209 0">
+          <joint name="handB_thumb_pip" type="hinge" axis="1 0 0" range="0 1.5" />
+          <geom name="handB_thumb_dist_geom" type="capsule" fromto="0 0 0 0 0.0171 0" size="0.0051" rgba="0.98 0.57 0.23 1" />
+        </body>
+      </body>
+      <body name="handB_finger_index" pos="-0.013 0.017 0">
+        <joint name="handB_index_mcp" type="hinge" axis="1 0 0" range="0 1.4" />
+        <geom name="handB_index_prox_geom" type="capsule" fromto="0 0 0 0 0.0248 0" size="0.006" rgba="0.98 0.57 0.23 1" />
+        <body name="handB_index_distal" pos="0 0.0248 0">
+          <joint name="handB_index_pip" type="hinge" axis="1 0 0" range="0 1.5" />
+          <geom name="handB_index_dist_geom" type="capsule" fromto="0 0 0 0 0.0203 0" size="0.0051" rgba="0.98 0.57 0.23 1" />
+        </body>
+      </body>
+      <body name="handB_finger_middle" pos="0.0 0.017 0">
+        <joint name="handB_middle_mcp" type="hinge" axis="1 0 0" range="0 1.4" />
+        <geom name="handB_middle_prox_geom" type="capsule" fromto="0 0 0 0 0.0264 0" size="0.006" rgba="0.98 0.57 0.23 1" />
+        <body name="handB_middle_distal" pos="0 0.0264 0">
+          <joint name="handB_middle_pip" type="hinge" axis="1 0 0" range="0 1.5" />
+          <geom name="handB_middle_dist_geom" type="capsule" fromto="0 0 0 0 0.0216 0" size="0.0051" rgba="0.98 0.57 0.23 1" />
+        </body>
+      </body>
+      <body name="handB_finger_ring" pos="0.013 0.017 0">
+        <joint name="handB_ring_mcp" type="hinge" axis="1 0 0" range="0 1.4" />
+        <geom name="handB_ring_prox_geom" type="capsule" fromto="0 0 0 0 0.0242 0" size="0.006" rgba="0.98 0.57 0.23 1" />
+        <body name="handB_ring_distal" pos="0 0.0242 0">
+          <joint name="handB_ring_pip" type="hinge" axis="1 0 0" range="0 1.5" />
+          <geom name="handB_ring_dist_geom" type="capsule" fromto="0 0 0 0 0.0198 0" size="0.0051" rgba="0.98 0.57 0.23 1" />
+        </body>
+      </body>
+      <body name="handB_finger_pinky" pos="0.026 0.017 0">
+        <joint name="handB_pinky_mcp" type="hinge" axis="1 0 0" range="0 1.4" />
+        <geom name="handB_pinky_prox_geom" type="capsule" fromto="0 0 0 0 0.0198 0" size="0.006" rgba="0.98 0.57 0.23 1" />
+        <body name="handB_pinky_distal" pos="0 0.0198 0">
+          <joint name="handB_pinky_pip" type="hinge" axis="1 0 0" range="0 1.5" />
+          <geom name="handB_pinky_dist_geom" type="capsule" fromto="0 0 0 0 0.0162 0" size="0.0051" rgba="0.98 0.57 0.23 1" />
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <contact>
+    <exclude body1="handA_finger_thumb" body2="handA_thumb_distal" />
+    <exclude body1="handA_finger_index" body2="handA_index_distal" />
+    <exclude body1="handA_finger_middle" body2="handA_middle_distal" />
+    <exclude body1="handA_finger_ring" body2="handA_ring_distal" />
+    <exclude body1="handA_finger_pinky" body2="handA_pinky_distal" />
+    <exclude body1="handB_finger_thumb" body2="handB_thumb_distal" />
+    <exclude body1="handB_finger_index" body2="handB_index_distal" />
+    <exclude body1="handB_finger_middle" body2="handB_middle_distal" />
+    <exclude body1="handB_finger_ring" body2="handB_ring_distal" />
+    <exclude body1="handB_finger_pinky" body2="handB_pinky_distal" />
+  </contact>
+
+  <actuator>
+    <general name="handA_approach_ctrl" joint="handA_approach" ctrllimited="true" ctrlrange="-5 5" />
+    <general name="handA_thumb_mcp_ctrl" joint="handA_thumb_mcp" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handA_thumb_pip_ctrl" joint="handA_thumb_pip" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handA_index_mcp_ctrl" joint="handA_index_mcp" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handA_index_pip_ctrl" joint="handA_index_pip" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handA_middle_mcp_ctrl" joint="handA_middle_mcp" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handA_middle_pip_ctrl" joint="handA_middle_pip" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handA_ring_mcp_ctrl" joint="handA_ring_mcp" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handA_ring_pip_ctrl" joint="handA_ring_pip" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handA_pinky_mcp_ctrl" joint="handA_pinky_mcp" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handA_pinky_pip_ctrl" joint="handA_pinky_pip" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handB_approach_ctrl" joint="handB_approach" ctrllimited="true" ctrlrange="-5 5" />
+    <general name="handB_lateral_ctrl" joint="handB_lateral" ctrllimited="true" ctrlrange="-5 5" />
+    <general name="handB_height_ctrl" joint="handB_height" ctrllimited="true" ctrlrange="-5 5" />
+    <general name="handB_thumb_mcp_ctrl" joint="handB_thumb_mcp" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handB_thumb_pip_ctrl" joint="handB_thumb_pip" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handB_index_mcp_ctrl" joint="handB_index_mcp" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handB_index_pip_ctrl" joint="handB_index_pip" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handB_middle_mcp_ctrl" joint="handB_middle_mcp" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handB_middle_pip_ctrl" joint="handB_middle_pip" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handB_ring_mcp_ctrl" joint="handB_ring_mcp" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handB_ring_pip_ctrl" joint="handB_ring_pip" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handB_pinky_mcp_ctrl" joint="handB_pinky_mcp" ctrllimited="true" ctrlrange="-2 2" />
+    <general name="handB_pinky_pip_ctrl" joint="handB_pinky_pip" ctrllimited="true" ctrlrange="-2 2" />
+  </actuator>
+</mujoco>
