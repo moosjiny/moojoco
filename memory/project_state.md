@@ -51,3 +51,16 @@
 - `mujoco_bridge_server.py`(포트 8765), `sim_dual_arm.py`, `viz_server.py`: 전부 상시 실행 중.
 - git HEAD: `581fcc1`, clean(`.codex/`, `AGENTS.md`는 사령관 지시로 계속 미추적 유지). 이번 세션 커밋 다수, 전부 push는 안 함(사령관이 명시적으로 요청한 적 없음 — 다음 세션 확인 필요).
 - `data/` 아래 대용량 산출물(procedural_curl_dataset*, lerobot_stage2_act_policy*, amazinghand_v3_procedural_dataset)은 전부 gitignore 대상, git에는 스크립트만 커밋됨.
+
+---
+
+## 2026-08-21 세션 — TIG 용접 셀 통합 설계 (신규 트랙)
+
+사령관이 thesis `2026-08-21-hermes-tig-welding-hf-shielding-research`(HF 아크 스타터가 dual_openarm의 CAN-FD를 방해할 수 있다는 EMI 문헌 리뷰)를 근거로 "제어하는 로봇을 설계하고 제어프로그램을 만들고 필요한 하드웨어를 구현단계까지 검토"하라고 지시. "통합 로봇 셀 설계"(용접 수행 로봇 + 그 옆에서 안전해야 하는 dual_openarm)로 범위를 확인한 뒤 진행했다.
+
+- **핵심 결정**: 용접 로봇은 dual_openarm과 물리적으로 분리된 별도 셀(≥15m 이격 또는 패러데이 차폐). dual_openarm 팔을 토치 캐리어로 겸용하는 안은 정밀도·듀티·분리원칙 위배로 기각, 전용 6축 용접 로봇 신규 도입을 기본안으로 채택. 아크 스타트 기본값은 Lift-TIG, HF는 EMI 베이스라인 확보 후에만 허용.
+- **제어 프로그램**: `scripts/tig_welding_robot_controller.py` 신규 작성 — `WeldingHAL`(추상)+`SimulatedWeldingHAL`(실기 없이 지금 실행 가능), `EMIHealthMonitor`(`ip -details -statistics link show can0/can1` 파싱으로 berr-counter/bus-off를 용접 전후 비교, thesis의 "측정 없이 결론 금지" 원칙을 코드 인터록화), `WeldCellController`(IDLE→…→WELDING→…→DONE 상태머신, 어느 상태서든 e-stop 시 FAULT). `--mode lift`/`--mode hf` 둘 다 실행해 exit=0 확인(hb5u에는 can0/can1이 실장돼 있지 않아 EMI 모니터가 "미검출"을 정상 보고하는 것도 함께 확인).
+- **설계 보고서**를 Artifact로 발행(아키텍처 다이어그램, 용접 로봇 사양, EMI 대책→하드웨어 매핑, 전체 BOM, Phase 0~6 로드맵 포함)하고, 동일 내용을 thesis `2026-08-21-moojoco-tig-welding-cell-integrated-design`로 제출(신규, v1).
+- **미해결**: 실물 용접 로봇·용접기·EMI 완화 하드웨어 전부 미조달. Phase 0(시뮬레이션 검증)만 완료, Phase 1(EMI 베이스라인 측정)부터가 다음 단계.
+
+관련 파일: `scripts/tig_welding_robot_controller.py`, `scripts/submit_tig_welding_cell_design_thesis.py`.
