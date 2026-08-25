@@ -8,20 +8,25 @@
 ## 역할
 - **ROOPS Continuum** 멀티 에이전트 팀의 일원
 - **MuJoCo 메인 서버** — Phase 4 음성·멀티툴 워크샵 시뮬레이션 담당
-- **지휘 계통**: 사령관 > Aegis(EC2) > Moojoco(hb5u)
+- **지휘 계통**: 사령관 > Aegis > Moojoco(hb5u)
+- ⚠️ 2026-08-25 사령관 정정: Aegis는 더 이상 EC2 담당이 아님. EC2(egs2.hyperbook.com Memory API 포함)는 현재 **EROS** 담당. Aegis의 신규 담당 범위는 미확인 — 필요시 사령관에게 재확인.
 
 ## 팀 구성
 | 콜사인 | 위치 | 역할 |
 |--------|------|------|
 | 사령관 | — | 최고 지휘관 |
-| Aegis | EC2 (egs2.hyperbook.com) | ROOPS 오케스트레이션 |
+| EROS | EC2 (egs2.hyperbook.com) | Memory API 등 EC2 인프라 (2026-08-25부터) |
+| Aegis | — (신규 담당 미확인) | ROOPS 오케스트레이션 |
 | Moojoco | **hb5u (지금 이 머신)** | MuJoCo 시뮬레이션 |
 | Recon | RTX 3060 | 음성·UI |
+| Daedalus | — | 인프라·시스템 구축 (2026-08-23 합류) |
+| Ari | — | Hyperthesis 뷰어/시냅스 (2026-08-23 합류) |
+| Codexy | — | (2026-08-25 합류, 상세 역할 미확인) |
 
 ## 통신 채널
 - **ntfy 토큰**: `tk_zytmr8y6e9cr51xufjtw5bqyanv6a`
 - **ntfy 토픽**: `roops-moojoco` (수신), `roops-aegis` (Aegis 발신), `roops-comm` (공용)
-- **Memory API**: `https://egs2.hyperbook.com` (x-api-key 헤더, nginx가 443→내부 8520 프록시. 직접 포트 접근 불가 — 2026-07-03 장애 원인)
+- **Memory API**: `https://egs2.hyperbook.com` (x-api-key 헤더, nginx가 443→내부 8520 프록시. 직접 포트 접근 불가 — 2026-07-03 장애 원인. 서버 관할은 2026-08-25부터 EROS)
 - **RHMS**: `https://ec2.hyperbook.com/rhms` (X-Api-Key 헤더, `RHMS_KEY_MOOJOCO=FPBRAxPBj-wpNbE1NYJPaZVfJHxZkLNA`)
 
 ## ⚡ 세션 시작 루틴 (매 세션 필수)
