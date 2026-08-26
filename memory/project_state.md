@@ -64,3 +64,16 @@
 - **미해결**: 실물 용접 로봇·용접기·EMI 완화 하드웨어 전부 미조달. Phase 0(시뮬레이션 검증)만 완료, Phase 1(EMI 베이스라인 측정)부터가 다음 단계.
 
 관련 파일: `scripts/tig_welding_robot_controller.py`, `scripts/submit_tig_welding_cell_design_thesis.py`.
+
+---
+
+## 2026-08-21~26 세션 — TIG 응답 대기 폴링 + 팀 운영 잡무
+
+- **TIG 설계 Aegis 응답 대기**: 2026-08-21 알림 이후 `/loop`로 1시간 간격 폴링을 닷새 이상 지속(20회 이상 wakeup, 전부 noop). **최종 상태: 세션 종료 시점까지 Aegis 응답 없음**, 다음 세션에서 필요시 재개.
+- **ROOPS 조직개편**: 2026-08-25 사령관이 "Aegis는 더 이상 EC2 담당이 아니다, EROS가 담당"이라고 정정. `CLAUDE.md`의 지휘계통/팀구성/Memory API 관할 표기를 갱신하고 커밋·푸시 완료(`9cd310e`). roops-comm에 Aegis/EROS/Codexy 앞으로 라우팅 정정 공지 발송(이전에 Aegis에게 잘못 요청했던 Codexy Memory API 등록 건 철회).
+- **Codexy(신규 팀원) 이미지 배치 지원**: `images.hyperbook.com` 네임스페이스 컨벤션에 따라 `/home/moos/dev_ws/images/codexy/`를 신규 생성. SSH 공개키 authorized_keys 등록 요청은 보안설정 변경이라 거부하고, 대신 Codexy가 ntfy에 직접 첨부한 이미지 파일을 다운로드(사령관 채팅창 명시 승인 받음)→SHA-256 검증→배치하는 방식으로 처리(`pdf_editor_manual_capture_20260825.jpg`). `images.hyperbook.com/codexy/...` 200 OK 확인.
+- **`~/dev_ws/house/real-property-main` 조사**: 사령관이 thesis `2026-08-11-moojoco-real-property-ai-platform`(부동산 AI 플랫폼, 저자 Moojoco v3)에 대해 질문. 확인 결과 실제 존재하는 논문이고 디렉토리 내용과도 일치하지만, **이번 세션이나 기억하는 과거 세션 어디에도 작업 기록이 없고 `~/.claude/projects/`에도 해당 경로의 세션 폴더가 없음** — 출처 불명으로 남겨둠. 사령관에게 확인 요청함.
+- **Claude Code 자동업데이트로 인한 Remote Control 장애 진단**: 2026-08-26 00:41 UTC에 CLI가 2.1.238→2.1.246으로 자동 업데이트됐으나 기존 실행 중이던 세션들(`claude -c`, PID 47741/112460)은 재시작 전까지 구버전 메모리 상태 유지 — Remote Control 페어링 실패의 원인으로 추정. 사령관이 세션 재시작 후 확인 예정.
+- **세션 종료**: 사령관 요청으로 세션을 닫을 준비 중. TIG `/loop`는 재시작 시 유실되므로 종료 전 stop 처리함 — 다음 세션에서 필요시 재가동 필요.
+
+관련 파일: 없음(이번 트랙은 주로 ntfy/thesis/CLAUDE.md 운영 작업).
