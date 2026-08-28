@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>실악수 재생 — 접촉 주도형 파지 v1 (MuJoCo 궤적)</title>
+<!--
+  기존 fingershake React 앱과 완전히 독립된 정적 페이지.
+  - 메인 앱 소스/번들 무수정 · 재빌드 없음 · 롤백 = 이 디렉토리 삭제
+  - MuJoCo 성공 궤적(trajectory.json, 20fps 148프레임)을 두 휴머노이드의
+    오른팔(2링크 IK) + v4 5지 감싸쥐기 손(MCP/PIP)에 그대로 재생
+  - thesis: 2026-08-28-moojoco-contact-driven-grasp-v1-first-success
+-->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #020617;
+               font-family: 'Segoe UI', 'Noto Sans KR', sans-serif; color: #e2e8f0; }
+  #hud { position: fixed; left: 16px; top: 14px; z-index: 10; pointer-events: none; }
+  #hud h1 { font-size: 15px; margin: 0 0 4px; letter-spacing: 0.04em; color: #7dd3fc; }
+  #hud .sub { font-size: 11px; color: #64748b; }
+  #phase { position: fixed; top: 14px; right: 16px; z-index: 10; font-size: 13px;
+           padding: 6px 14px; border-radius: 8px; background: #0f172acc;
+           border: 1px solid #1e293b; letter-spacing: 0.08em; }
+  #phase b { color: #38bdf8; }
+  #ctrl { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+          z-index: 10; display: flex; gap: 10px; align-items: center;
+          background: #0f172acc; border: 1px solid #1e293b; border-radius: 12px;
+          padding: 10px 16px; backdrop-filter: blur(6px); }
+  #ctrl button { background: #1e293b; color: #e2e8f0; border: 1px solid #334155;
+                 border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 13px; }
+  #ctrl button:hover { background: #334155; }
+  #seek { width: 260px; accent-color: #38bdf8; }
+  #speed { width: 70px; accent-color: #a78bfa; }
+  .lbl { font-size: 11px; color: #94a3b8; }
+  #err { position: fixed; inset: 0; display: none; place-items: center; z-index: 20;
+         background: #020617; font-size: 14px; color: #f87171; text-align: center; }
+  #banner { position: fixed; left: 16px; bottom: 18px; z-index: 10; font-size: 11px;
+            color: #475569; line-height: 1.5; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="hud">
+  <h1>REAL GRASP REPLAY — 접촉 주도형 파지 v1</h1>
+  <div class="sub">MuJoCo 검증 궤적 실재생 · 침투 게이트 4.37% · 10/10 감싸쥠 유지 1.0 · 기존 앱과 독립 페이지</div>
+</div>
+<div id="phase">단계: <b id="phaseName">로딩…</b></div>
+<div id="ctrl">
+  <button id="playBtn">일시정지</button>
+  <input id="seek" type="range" min="0" max="147" value="0" />
+  <span class="lbl" id="timeLbl">0.0s</span>
+  <span class="lbl">속도</span>
+  <input id="speed" type="range" min="0.25" max="2" step="0.25" value="1" />
+  <span class="lbl" id="speedLbl">1.0×</span>
+</div>
+<div id="banner">
+  thesis.hyperbook.com/papers/2026-08-28-moojoco-contact-driven-grasp-v1-first-success<br/>
+  마우스 드래그 회전 · 휠 줌 · 우클릭 이동
+</div>
+<div id="err"><div>페이지 로드 실패 — 네트워크(three.js CDN) 또는 trajectory.json 확인 필요.<br/>기존 fingershake 앱(/)은 영향 없음.</div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const S = 2.5;                    // MuJoCo(m) → 손 기하 스케일 (도킹 상대기하는 이 배율로 정확)
+const T = 0.8;                    // 접근 이동거리 시각 압축 배율 (팔 도달범위 내로)
+const DOCK_Y = 1.32;              // 도킹 높이
+const MJ_PALM_Z = 0.05;           // MuJoCo A손바닥 기준 높이
+// 도킹 종점(최종 프레임 실측값 기준) — 이동은 T배율, 종점은 S배율로 정합
+const QA_END = -0.025, QB_END = 0.151;
+
+// ---------- 씬 ----------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x020617);
+scene.fog = new THREE.Fog(0x020617, 8, 22);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 100);
+camera.position.set(0.4, 1.9, 3.4);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.2, 0);
+controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight(0x94a3b8, 0x0f172a, 0.7));
+const key = new THREE.DirectionalLight(0xffffff, 1.6);
+key.position.set(3, 6, 4); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x38bdf8, 0.5);
+rim.position.set(-4, 3, -3); scene.add(rim);
+
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(30, 30),
+  new THREE.MeshStandardMaterial({ color: 0x0b1220, roughness: 0.9 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+scene.add(new THREE.GridHelper(20, 40, 0x1e293b, 0x0f172a));
+
+// ---------- 재질 ----------
+function mats(accentHex, visorHex) {
+  return {
+    main: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.7, roughness: 0.3 }),
+    accent: new THREE.MeshStandardMaterial({ color: accentHex, metalness: 0.8, roughness: 0.25 }),
+    joint: new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9, roughness: 0.4 }),
+    visor: new THREE.MeshBasicMaterial({ color: visorHex }),
+    pad: new THREE.MeshStandardMaterial({ color: visorHex, emissive: visorHex, emissiveIntensity: 0.4 }),
+  };
+}
+
+// ---------- v4 감싸쥐기 손 (MuJoCo amazinghand_5finger_docking_v4 비율 그대로) ----------
+// 손 로컬 좌표: +X = 뻗는 방향(상대 로봇 쪽), +Y = 손등(위), Z = 좌우.
+// A손은 그대로(손바닥 위, 손가락 위로 감김), B손은 루트를 X축 π 회전(손바닥 아래).
+const FINGERS = [
+  { name: 'thumb',  z: -0.026, prox: 0.0209, dist: 0.0171 },
+  { name: 'index',  z: -0.013, prox: 0.0248, dist: 0.0203 },
+  { name: 'middle', z:  0.0,   prox: 0.0264, dist: 0.0216 },
+  { name: 'ring',   z:  0.013, prox: 0.0242, dist: 0.0198 },
+  { name: 'pinky',  z:  0.026, prox: 0.0198, dist: 0.0162 },
+];
+const PALM = { halfX: 0.017, halfY: 0.008, halfZ: 0.032 }; // MuJoCo (y,z,x)반폭 → 로컬 (x,y,z)
+
+function buildV4Hand(m) {
+  const root = new THREE.Group();
+  const palm = new THREE.Mesh(
+    new THREE.BoxGeometry(PALM.halfX * 2 * S, PALM.halfY * 2 * S, PALM.halfZ * 2 * S), m.accent);
+  palm.castShadow = true;
+  root.add(palm);
+
+  // 손바닥 촉각 그리드(기존 앱 디자인 요소 계승)
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) {
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.006, 8, 8), m.pad);
+    dot.position.set((r - 0.5) * 0.03, PALM.halfY * S + 0.002, (c - 1.5) * 0.032);
+    root.add(dot);
+  }
+
+  const joints = {};
+  for (const f of FINGERS) {
+    const mcp = new THREE.Group();
+    mcp.position.set(PALM.halfX * S, 0, f.z * S);   // 손바닥 +X 모서리
+    root.add(mcp);
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.03, 10), m.joint);
+    pin.rotation.x = Math.PI / 2; mcp.add(pin);
+    const prox = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.006 * S, f.prox * S, 4, 10), m.main);
+    prox.rotation.z = Math.PI / 2;                    // 캡슐 축을 +X로
+    prox.position.x = f.prox * S / 2;
+    prox.castShadow = true; mcp.add(prox);
+
+    const pip = new THREE.Group();
+    pip.position.x = f.prox * S;
+    mcp.add(pip);
+    const pin2 = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.026, 10), m.joint);
+    pin2.rotation.x = Math.PI / 2; pip.add(pin2);
+    const dist = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.0051 * S, f.dist * S, 4, 10), m.accent);
+    dist.rotation.z = Math.PI / 2;
+    dist.position.x = f.dist * S / 2;
+    dist.castShadow = true; pip.add(dist);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.0052 * S, 10, 10), m.pad);
+    tip.position.x = f.dist * S; pip.add(tip);
+
+    joints[f.name] = { mcp, pip };
+  }
+  return { root, joints };
+}
+
+// ---------- 휴머노이드 (기존 fingershake 실루엣 축약: 몸통·머리·다리·왼팔 정적, 오른팔 IK) ----------
+const L1 = 0.40, L2 = 0.40;  // 상완·전완 길이
+function buildRobot(m, facing /* +1: +X를 봄, -1 */) {
+  const g = new THREE.Group();
+  const pelvis = new THREE.Group(); pelvis.position.y = 1.05; g.add(pelvis);
+  const add = (parent, geo, mat, x, y, z) => {
+    const mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y, z);
+    mesh.castShadow = true; parent.add(mesh); return mesh;
+  };
+  add(pelvis, new THREE.BoxGeometry(0.38, 0.2, 0.28), m.accent, 0, 0, 0);
+  const torso = new THREE.Group(); torso.position.y = 0.15; pelvis.add(torso);
+  add(torso, new THREE.BoxGeometry(0.52, 0.55, 0.36), m.main, 0, 0.32, 0);
+  const reactor = add(torso, new THREE.CylinderGeometry(0.08, 0.08, 0.06, 16), m.visor, facing * 0.19, 0.35, 0);
+  reactor.rotation.z = Math.PI / 2;
+  add(torso, new THREE.CylinderGeometry(0.07, 0.09, 0.1, 12), m.joint, 0, 0.65, 0);
+  const head = add(torso, new THREE.BoxGeometry(0.28, 0.26, 0.28), m.main, 0, 0.85, 0);
+  const visor = add(torso, new THREE.BoxGeometry(0.06, 0.07, 0.22), m.visor, facing * 0.13, 0.87, 0);
+  // 다리
+  for (const zs of [-1, 1]) {
+    add(pelvis, new THREE.CylinderGeometry(0.09, 0.07, 0.45, 12), m.main, 0, -0.3, zs * 0.16);
+    add(pelvis, new THREE.CylinderGeometry(0.07, 0.06, 0.45, 12), m.accent, 0, -0.75, zs * 0.16);
+    add(pelvis, new THREE.BoxGeometry(0.28, 0.09, 0.14), m.joint, facing * 0.05, -1.0, zs * 0.16);
+  }
+  // 왼팔(관성 자세 고정) — 어깨 z: 바라보는 방향 기준 왼쪽
+  const lSh = new THREE.Group(); lSh.position.set(0, 0.5, -facing * 0.32); torso.add(lSh);
+  add(lSh, new THREE.SphereGeometry(0.09, 12, 12), m.accent, 0, 0, 0);
+  add(lSh, new THREE.CylinderGeometry(0.065, 0.055, 0.38, 12), m.main, 0, -0.19, 0);
+  add(lSh, new THREE.CylinderGeometry(0.055, 0.045, 0.36, 12), m.accent, 0, -0.55, 0);
+  add(lSh, new THREE.BoxGeometry(0.08, 0.1, 0.05), m.joint, 0, -0.78, 0);
+  // 오른팔: IK로 매 프레임 어깨→팔꿈치→손목 선을 다시 그림
+  const rShPos = new THREE.Vector3(0, 0.5, facing * 0.32); // torso 로컬
+  add(torso, new THREE.SphereGeometry(0.09, 12, 12), m.accent, rShPos.x, rShPos.y, rShPos.z);
+  // 팔 세그먼트는 월드좌표로 매 프레임 재배치되므로 로봇 그룹이 아니라 scene에 부착
+  const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 1, 12), m.main);
+  const fore  = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.045, 1, 12), m.accent);
+  const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), m.joint);
+  upper.castShadow = fore.castShadow = elbow.castShadow = true;
+  scene.add(upper, fore, elbow);
+  return { g, torso, rShPos, upper, fore, elbow };
+}
+
+function placeSegment(mesh, a, b, thickness) {
+  const dir = new THREE.Vector3().subVectors(b, a);
+  const len = dir.length();
+  mesh.scale.set(1, len, 1);
+  mesh.position.copy(a).addScaledVector(dir, 0.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+}
+
+// 2링크 IK: 어깨 S에서 손목 W까지, 팔꿈치는 아래-바깥쪽 해 선택
+function solveArm(Sw, Ww) {
+  const d = Math.min(Math.max(Sw.distanceTo(Ww), Math.abs(L1 - L2) + 1e-4), L1 + L2 - 1e-4);
+  const dir = new THREE.Vector3().subVectors(Ww, Sw).normalize();
+  const a = (L1 * L1 - L2 * L2 + d * d) / (2 * d);
+  const h = Math.sqrt(Math.max(L1 * L1 - a * a, 0));
+  const mid = new THREE.Vector3().copy(Sw).addScaledVector(dir, a);
+  // 팔꿈치 오프셋 방향: 수직 평면에서 아래쪽
+  const up = new THREE.Vector3(0, 1, 0);
+  let perp = new THREE.Vector3().crossVectors(dir, new THREE.Vector3().crossVectors(up, dir));
+  if (perp.lengthSq() < 1e-8) perp = new THREE.Vector3(0, 0, 1);
+  perp.normalize();
+  return new THREE.Vector3().copy(mid).addScaledVector(perp, -h);
+}
+
+// ---------- 로봇·손 배치 ----------
+const mA = mats(0x2563eb, 0x38bdf8);  // Alpha: 블루 (MuJoCo A=청록 계승)
+const mB = mats(0xd97706, 0xf59e0b);  // Beta: 앰버 (MuJoCo B=주황 계승)
+const robotA = buildRobot(mA, +1);
+const robotB = buildRobot(mB, -1);
+// 손목 x: 도킹 종점은 S배율 고정, 접근 이동은 T배율 압축 → 팔 도달범위(0.8m) 내
+robotA.g.position.set(-0.50, 0, 0);
+robotB.g.position.set(+0.55, 0, 0);
+scene.add(robotA.g, robotB.g);
+
+const handA = buildV4Hand(mA);
+const handB = buildV4Hand(mB);
+handB.root.rotation.set(Math.PI, Math.PI, 0); // X축 π(손바닥 아래로) + 손가락 -X(A쪽)로
+scene.add(handA.root, handB.root);
+
+// ---------- 궤적 로드·재생 ----------
+const err = document.getElementById('err');
+let traj = null;
+try {
+  const res = await fetch('./trajectory.json');
+  traj = await res.json();
+} catch (e) { err.style.display = 'grid'; throw e; }
+
+const frames = traj.frames, FPS = traj.fps;
+const seek = document.getElementById('seek');
+seek.max = String(frames.length - 1);
+const phaseName = document.getElementById('phaseName');
+const timeLbl = document.getElementById('timeLbl');
+const speedLbl = document.getElementById('speedLbl');
+const playBtn = document.getElementById('playBtn');
+const speedInp = document.getElementById('speed');
+let playing = true, fIdx = 0, acc = 0, speed = 1.0;
+playBtn.onclick = () => { playing = !playing; playBtn.textContent = playing ? '일시정지' : '재생'; };
+seek.oninput = () => { fIdx = Number(seek.value); acc = 0; };
+speedInp.oninput = () => { speed = Number(speedInp.value); speedLbl.textContent = speed.toFixed(2).replace(/0+$/,'').replace(/\.$/,'.0') + '×'; };
+
+const PHASE_KO = { APPROACH: '접근 APPROACH', DESCEND: '하강 도킹 DESCEND', CLOSE: '폐쇄 CLOSE', HOLD: '유지 HOLD ✓' };
+const tmpS = new THREE.Vector3(), tmpW = new THREE.Vector3();
+
+function applyFrame(fr) {
+  const q = fr.qpos;
+  // 손목 위치: MuJoCo (y,z,x) → 월드 (X,Y,Z). 종점 S배율 + 이동 T배율 압축
+  const ax = QA_END * S + (q.handA_approach - QA_END) * T;
+  const ay = DOCK_Y;                                     // A 손바닥면 기준
+  const bx = (0.12 - QB_END) * S + (QB_END - q.handB_approach) * T;
+  const by = DOCK_Y + (0.070 - q.handB_height - MJ_PALM_Z) * S;
+  const bz = q.handB_lateral * S;
+  handA.root.position.set(ax, ay, 0);
+  handB.root.position.set(bx, by, bz);
+  // 손가락 관절 (A: +Z 회전이 위로 감김 / B: 루트 π 반전이 방향 처리)
+  for (const f of FINGERS) {
+    handA.joints[f.name].mcp.rotation.z = q[`handA_${f.name}_mcp`];
+    handA.joints[f.name].pip.rotation.z = q[`handA_${f.name}_pip`];
+    handB.joints[f.name].mcp.rotation.z = q[`handB_${f.name}_mcp`];
+    handB.joints[f.name].pip.rotation.z = q[`handB_${f.name}_pip`];
+  }
+  // 오른팔 IK: 어깨(월드) → 손목(손 루트 -X쪽 손목점)
+  for (const [rb, hand, sign] of [[robotA, handA, +1], [robotB, handB, -1]]) {
+    rb.torso.updateWorldMatrix(true, false);
+    tmpS.copy(rb.rShPos).applyMatrix4(rb.torso.matrixWorld);
+    tmpW.copy(hand.root.position); tmpW.x -= sign * (PALM.halfX * S + 0.085);
+    const elbowP = solveArm(tmpS, tmpW);
+    placeSegment(rb.upper, tmpS, elbowP);
+    placeSegment(rb.fore, elbowP, tmpW);
+    rb.elbow.position.copy(elbowP);
+  }
+  phaseName.textContent = PHASE_KO[fr.phase] ?? fr.phase;
+  timeLbl.textContent = fr.t.toFixed(1) + 's';
+  seek.value = String(fIdx);
+}
+
+window.__dbg = { handA, handB, robotA, robotB, frames, THREE, applyFrame: (i) => { fIdx = i; applyFrame(frames[i]); } };
+
+let last = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = (now - last) / 1000; last = now;
+  if (playing && frames.length) {
+    acc += dt * speed * FPS;
+    while (acc >= 1) { acc -= 1; fIdx = (fIdx + 1) % frames.length; }
+  }
+  if (frames.length) applyFrame(frames[fIdx]);
+  controls.update();
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(loop);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
