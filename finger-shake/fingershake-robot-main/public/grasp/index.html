@@ -136,10 +136,17 @@ function buildV4Hand(m) {
   palm.castShadow = true;
   root.add(palm);
 
-  // 손바닥 촉각 그리드(기존 앱 디자인 요소 계승) — S 배율 미적용 버그 수정(2026-09-09, Codezy 리뷰 반영)
+  // 손바닥 촉각 그리드(기존 앱 디자인 요소 계승)
+  // 2026-09-09: S 배율 미적용 버그 수정(구체 반경만 조정) → 겹침 8.013mm에서 2.49mm로 축소했으나 완전 제거는 아니었음
+  // 2026-09-10: 구체 형상을 표면에 평평하게 붙는 원반(CircleGeometry)으로 교체.
+  //   자신의 손바닥 표면(y = PALM.halfY*S)을 절대 넘어서지 않도록 살짝 안쪽으로 묻어(마진 0.0002*S)
+  //   장식 요소 자체의 돌출을 원천적으로 없앰 — 반대편 손바닥과의 겹침은 이제 손바닥 박스 간 겹침(이미
+  //   1단계에서 물리적으로 검증된 값, -0.0135mm)에서만 발생하고 이 마커가 추가로 만들지 않는다.
+  const DOT_MARGIN = 0.0002 * S;
   for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) {
-    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.0015 * S, 8, 8), m.pad);
-    dot.position.set((r - 0.5) * 0.03 * S, PALM.halfY * S + 0.0005 * S, (c - 1.5) * 0.032 * S);
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.0035 * S, 16), m.pad);
+    dot.rotation.x = -Math.PI / 2; // 법선을 +Y(손바닥 바깥 방향)로
+    dot.position.set((r - 0.5) * 0.03 * S, PALM.halfY * S - DOT_MARGIN, (c - 1.5) * 0.032 * S);
     root.add(dot);
   }
 
