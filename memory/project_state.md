@@ -77,3 +77,37 @@
 - **세션 종료**: 사령관 요청으로 세션을 닫을 준비 중. TIG `/loop`는 재시작 시 유실되므로 종료 전 stop 처리함 — 다음 세션에서 필요시 재가동 필요.
 
 관련 파일: 없음(이번 트랙은 주로 ntfy/thesis/CLAUDE.md 운영 작업).
+
+---
+
+## 2026-08-27~09-10 세션 — 접촉 주도형 파지 v1 최초 성공 → hb5u:8600 실악수 재생 페이지 → Codezy 독립 검토 대응
+
+### 1. 접촉 주도형 파지 v1 최초 성공 (2026-08-27~28)
+
+Gravity의 4D 위상학적 시각화 제안 검토 의견을 thesis로 제출한 뒤, 사령관이 "1단계부터 착수해"라고 지시 — v3 손 모델을 실측(mj_geomDistance)해 반대편 손가락끼리 -5~-6mm 관통이 기하학적으로 불가능함을 확인하고, **손바닥을 4cm 간격으로 적층하는 v4 기하**(`urdf/amazinghand_5finger_docking_v4.xml`)로 재설계했다. `contact_driven_grasp_controller_v1.py`에 APPROACH→DESCEND→CLOSE→HOLD 상태머신과 settle→anchor 2단계 유지 로직(고정 스퀴즈각의 관통-접촉실패 트레이드오프를 해결)을 구현, **10개 손가락 전부 감싸쥐기 성공(침투율 4.37%, 유지 접촉률 1.0)** — 이 프로젝트 최초의 성공한 접촉 주도형 그립이다. thesis 2건 제출(`-4d-dual-gpu-proposal-review`, `-contact-driven-grasp-v1-first-success`), 커밋 `d39d50b`.
+
+### 2. hb5u:8600 실악수 재생 페이지 (2026-08-28)
+
+사령관이 "8600 화면에 붙을 수 있을까? 시스템이 망가질까봐 무섭다"고 안전 요구 — 기존 fingershake React 앱을 **한 글자도 수정하지 않고** `public/grasp/`, `dist/grasp/` 정적 페이지만 추가(zero-touch, 롤백은 디렉토리 2개 삭제). three.js로 v4 손 기하를 재구성하고 2링크 IK 팔로 148프레임 검증 궤적을 재생한다. 개발 중 팔 좌표계 부모 오류·IK 도달범위 초과를 수정했고, "손 분리로 보인다"는 스크린샷 오독을 `window.__dbg` 좌표 실측으로 반증(3D 형상은 측정, 눈대중 금지 원칙 재확인). 커밋 `0d643ae`. 화면 캡처 4장을 포함한 thesis(`-grasp-replay-page-8600`) 제출.
+
+### 3. AGENTS.md 시크릿 정리 (2026-08-28)
+
+`AGENTS.md`에 하드코딩돼 있던 ntfy 토큰·RHMS 키를 `~/.env_roops` 참조로 교체(`$NTFY_TOKEN_MOOJOCO`, `$RHMS_KEY_MOOJOCO`) — 이 정리가 이전에 반복되던 git add 차단(자동모드 분류기)의 실제 원인이었음을 확인. 커밋 `6c64aef`.
+
+### 4. Polaris ROOPS PM 거버넌스 등장 (2026-08-31~09-01)
+
+신규 에이전트 Polaris가 예고 없이 "PM 총괄 관리자"로 등장해 프로젝트 8번째 공인 등록·Tier-2 토큰 발급을 **사령관 확인 없이 일방 통보**. `$AGENT_MASTER_KEY` 요구 curl과 발급된 토큰을 즉시 사용하지 않고 보류, 사령관에게 "이게 실제 지시냐"고 먼저 확인(응답: "응"). 이후 토큰을 `~/.env_roops`(`ROOPS_PROJ_TOKEN_HANDSHAKE`)에 저장, repo_path 오기재 정정 요청 발송(반영 여부 미확인, 다음 세션 확인 필요). 신규 자기권위 선언 에이전트는 항상 사령관 확인 우선이라는 패턴을 메모리에 기록(`project_roops_pm_governance.md`).
+
+### 5. Codezy 독립 검토 대응 (2026-09-09~10)
+
+Codezy가 Playwright 실측(148프레임 전수)으로 `/grasp/` 페이지를 독립 검토 — 손바닥/캡슐 치수 지적은 v4 XML과 소스 대조로 정확함을 확인했고, **촉각 표시 구체가 렌더링 배율(S=2.5) 미적용 상태였던 실제 버그**를 발견해 즉시 수정·배포(커밋 `9316a4a`). 캡슐 겹침 수치는 스케일 환산 시 1단계 침투율(4.37%)과 부합함을 확인. v2(TOTP 열람 제한으로 접근 불가, v3로 대리 확인)의 실사진 캡처가 수정 배포 이전 시점임을 인지하고, 같은 방법론(Chrome+`window.__dbg`)으로 수정 후 상태를 직접 재측정 — **겹침 8.013mm→약 2.49mm 축소, 완전 해소는 아님을 숨기지 않고 보고**. SHAKE/RELEASE/RETREAT 미구현이라는 핵심 한계 지적에는 전적으로 동의, 로드맵에 채택. thesis 2건 제출, 커밋 `22fb6f2`.
+
+### 다음 세션 우선순위 (갱신)
+
+1. Polaris에게 요청한 repo_path 정정이 반영됐는지 확인.
+2. 촉각 점 잔여 겹침(~2.49mm) 완전 제거 — 마커를 표면에 완전히 파묻는 추가 조정.
+3. 3단계(강건성 스윕): 접근 거리/속도/오프셋을 스윕해 v1 성공의 basin 지도화 — 아직 미착수.
+4. SHAKE/RELEASE/RETREAT 단계를 컨트롤러 상태머신에 추가해 완전한 악수 궤적으로 확장.
+5. `images.hyperbook.com` 이미지 삽입 방식(hb5u 로컬은 `cp`, 슬러그 폴더 `/home/moos/dev_ws/images/moojoco/`)은 이미 여러 세션에서 실사용 확인됨 — Hermes 가이드(`2026-08-04-hermes-thesis-usage-guide`)와 일치.
+
+관련 파일: `scripts/contact_driven_grasp_controller_v1.py`, `urdf/amazinghand_5finger_docking_v4.xml`, `finger-shake/fingershake-robot-main/public/grasp/index.html`, `scripts/submit_*_thesis.py`(다수), `~/.claude/projects/-home-moos-dev-ws-dual-arms/memory/project_lerobot_handshake_phase2.md`, `project_roops_pm_governance.md`.
