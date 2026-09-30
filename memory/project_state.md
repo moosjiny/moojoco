@@ -128,14 +128,16 @@ Codezy가 Playwright 실측(148프레임 전수)으로 `/grasp/` 페이지를 �
 - **사령관 지적 기반 기술 감사 논문 제출 및 v2 개정**: 사령관의 "나노바나나 비전 청사진" 간파 이후, EC2 `generate_handshake_video.py`(Gemini 이미지 3장 크로스페이드) 코드 확인 및 `dual_handshake.xml` 26mm 자기침투 실측 감사, `verified_handshake.xml` 침투 0mm 전환을 상세 기록한 논문 `2026-10-01-moojoco-handshake-physics-vs-vision-blueprint-audit` 공식 제출 완료 (200 OK). 이어서 사령관 지시에 따라 실측 비교 사진 3종([그림 1] 나노바나나 컨셉 렌더, [그림 2] 26mm 자기침투 EGL 렌더, [그림 3] v6 무관통 EGL 렌더)을 `images.hyperbook.com`을 통해 본문에 삽입한 v2 개정 배포 완료. `roops-comm` 공지 완료.
 - **HyperHandshake Studio (`/handshake/`) 신규 개발·배포**: 기존 `/grasp`의 4단계(HOLD에서 멈춤) 한계를 돌파하여, 사령관님의 5대 철칙(엄지 90° L자 직각, 손목 후퇴)과 6단계 풀 수명주기(`APPROACH → V-WEB DOCK → GRASP LATCH → DYNAMIC SHAKE → RELEASE → RETREAT`)를 완벽히 구현한 차세대 3D 스튜디오 배포 완료. `http://hb5u.hyperbook.com:8600/handshake/` 즉시 서빙 (무관통 0.00mm, 실시간 물리 텔레메트리 콕핏, 4대 카메라 프리셋, 동적 파라미터 튜닝 패널 탑재).
 - **진화 실증 논문 제출 완료**: 사령관 지시에 따라 Playwright로 실측한 4대 카메라 시점 스크린샷 4종 및 12초 풀 사이클 애니메이션 GIF를 수록한 정식 논문 `2026-10-01-moojoco-from-grasp-to-handshake-studio-evolution` 제출 완료 (200 OK). `roops-comm` 및 Memory API 전파 완료.
+- **Git 원격 푸시 및 Gravity 자문 요청 전파**: 전수 코드 커밋 및 원격 푸시(`0d26277`) 완료. ntfy `roops-gravity`(`DQrBYFPWVGZc`), `roops-comm`, Memory API(`6f84b68d-...`)로 Gravity에게 기술 분석 결과 및 신규 스튜디오 성과를 전파하고 3대 자문(Z축 악수 궤적 수치 정합성, 4K EGL 영상 지원, CWC 평가 확장) 요청 발송 완료.
 
 ### 다음 세션 우선순위
-1. Gravity로부터 악수 물리 재현 번들 인입 시 `incoming/`에서 수신 및 압축 해제.
-2. hb5u에서 독립 실행(headless EGL)하여 XML 로드 에러, 초기 침투(dist < 0), 관통 여부 전수 검증.
-3. 실제 `mj_step` 기반의 물리 시뮬레이션 고해상도(1080p/4K) 렌더링 영상(MP4/GIF) 생성 및 thesis 첨부 지원.
-4. (이전 과제 연계) 3단계 강건성 스윕 및 SHAKE/RELEASE/RETREAT 컨트롤러 확장.
+1. Gravity로부터의 ntfy/Memory API 기술 소견 및 번들 응답 확인.
+2. `verified_handshake.xml` 기반 순수 `mj_step` 4K/60fps 무가공 물리 렌더링 영상(MP4/GIF) 추출 파이프라인 구축.
+3. hb5u:8600 `/handshake/` 스튜디오와 실제 MuJoCo WebSocket 브리지 실시간 연동 고도화.
+4. Handshake Lab(Ari) 및 접촉 렌치 원뿔(CWC) 수치 평가 통합.
 
 관련 파일: `incoming/`, `scripts/submit_handshake_studio_thesis.py`, `scripts/capture_handshake_studio.py`, `images/moojoco/`, `finger-shake/fingershake-robot-main/public/handshake/index.html`, `memory/project_state.md`.
+
 
 
 
