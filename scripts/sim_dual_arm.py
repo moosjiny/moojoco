@@ -3,6 +3,7 @@ os.environ['MUJOCO_GL'] = 'egl'  # GPU EGL 렌더링
 
 import mujoco
 import rerun as rr
+import rerun.blueprint as rrb
 import numpy as np
 import time
 import trimesh
@@ -36,24 +37,45 @@ def run_sim():
     renderer_rw    = mujoco.Renderer(model, height=WRIST_H, width=WRIST_W)
 
     rr.init("OpenArm_WowRobo_V4", spawn=False)
-    # server_memory_limit: 서버 버퍼 상한 설정 (초과 시 오래된 데이터 자동 제거)
-    server_uri = rr.serve_grpc(grpc_port=9876, server_memory_limit="512MB")
+    server_uri = rr.serve_grpc(grpc_port=9876, server_memory_limit="1GB")
     rr.serve_web_viewer(web_port=9090, connect_to=server_uri)
-    print("Dual-arm sim started (EGL GPU rendering)")
+    print("Dual-arm sim started (EGL GPU rendering) on http://localhost:9090")
 
-    # --- 정적 메쉬 사전 로깅 ---
-    rr.log("world/floor", rr.Boxes3D(half_sizes=[[1.5, 1.5, 0.001]], colors=[[180, 180, 180]]), static=True)
+    # --- Blueprint 설정: 3D 로봇 뷰어를 기본 중앙 화면으로 강제 배치 ---
+    blueprint = rrb.Blueprint(
+        rrb.Horizontal(
+            rrb.Spatial3DView(
+                origin="world",
+                name="🤖 Dual-Arm Robot (3D View)",
+            ),
+            rrb.Vertical(
+                rrb.Spatial2DView(origin="cameras/top", name="Top Camera"),
+                rrb.Spatial2DView(origin="cameras/front", name="Front Camera"),
+                rrb.TextDocumentView(origin="status/sweep", name="Joint Sweep Status"),
+            ),
+            column_shares=[3, 1],
+        )
+    )
+    rr.send_blueprint(blueprint)
 
+    # 바닥면
+    rr.log("world/floor", rr.Boxes3D(half_sizes=[[1.5, 1.5, 0.001]], colors=[[160, 160, 160]]), static=True)
+
+    # --- 3D 메쉬 데이터 메모리 사전 로드 ---
+    mesh_cache = {}
     base_mesh_path = os.path.join(MESH_DIR, "base_link.stl")
     if os.path.exists(base_mesh_path):
-        bm = trimesh.load(base_mesh_path)
-        rr.log(f"{ROBOT_ROOT}/central_base/visual",
-               rr.Mesh3D(vertex_positions=bm.vertices * 0.001,
-                         triangle_indices=bm.faces,
-                         vertex_normals=bm.vertex_normals,
-                         vertex_colors=np.tile([180, 180, 180], (len(bm.vertices), 1))), static=True)
+        try:
+            bm = trimesh.load(base_mesh_path)
+            mesh_cache["base"] = {
+                "v": bm.vertices * 0.001,
+                "f": bm.faces,
+                "n": bm.vertex_normals,
+                "c": np.tile([180, 180, 180], (len(bm.vertices), 1))
+            }
+        except Exception as e:
+            print(f"Base mesh load error: {e}")
 
-    mesh_map = {f"link{i}": f"link{i}.stl" for i in range(1, 8)}
     STL_OFFSETS = {
         "base_link": [0.0, 0.0, 0.0],
         "link1": [0.0, 0.0, 62.5],
@@ -65,6 +87,7 @@ def run_sim():
         "link7": [0.0, 0.0, 558.5],
     }
 
+    mesh_map = {f"link{i}": f"link{i}.stl" for i in range(1, 8)}
     for name, file in mesh_map.items():
         path = os.path.join(MESH_DIR, file)
         if not os.path.exists(path):
@@ -76,26 +99,26 @@ def run_sim():
             n_mesh = mesh.vertex_normals
 
             v_l = (mesh.vertices - offset) * 0.001
-            rr.log(f"{ROBOT_ROOT}/left_{name}/visual",
-                   rr.Mesh3D(vertex_positions=v_l, triangle_indices=mesh.faces,
-                             vertex_normals=n_mesh,
-                             vertex_colors=np.tile([40, 80, 200], (num_v, 1))), static=True)
-
             v_r_raw = mesh.vertices.copy()
             offset_r = offset.copy()
             if name in ["link1", "link2", "link3"]:
                 v_r_raw[:, 0] = -v_r_raw[:, 0]
                 offset_r[0] = -offset[0]
             v_r = (v_r_raw - offset_r) * 0.001
-            rr.log(f"{ROBOT_ROOT}/right_{name}/visual",
-                   rr.Mesh3D(vertex_positions=v_r, triangle_indices=mesh.faces,
-                             vertex_normals=n_mesh,
-                             vertex_colors=np.tile([200, 40, 40], (num_v, 1))), static=True)
+
+            mesh_cache[f"left_{name}"] = {
+                "v": v_l, "f": mesh.faces, "n": n_mesh,
+                "c": np.tile([56, 189, 248], (num_v, 1))  # Vivid Sky Blue
+            }
+            mesh_cache[f"right_{name}"] = {
+                "v": v_r, "f": mesh.faces, "n": n_mesh,
+                "c": np.tile([244, 63, 94], (num_v, 1))   # Vivid Rose Red
+            }
         except Exception as e:
             print(f"Mesh load error {file}: {e}")
 
     finger_dir = os.path.join(MESH_DIR, "gripper")
-    finger_parts = [("finger_0.obj", [180, 180, 180]), ("finger_1.obj", [30, 30, 30])]
+    finger_parts = [("finger_0.obj", [200, 200, 200]), ("finger_1.obj", [40, 40, 40])]
     NF_OFFSET_MM = np.array([0.0,  50.0, 673.001])
     FL_OFFSET_MM = np.array([0.0, -50.0, 673.001])
     for part_file, color in finger_parts:
@@ -111,15 +134,42 @@ def run_sim():
             v_fl = (v_fl_raw - FL_OFFSET_MM) * 0.001
             faces_fl = fmesh.faces[:, ::-1]
             for side in ("left", "right"):
-                rr.log(f"{ROBOT_ROOT}/{side}_finger_1/visual_{part_file}",
-                       rr.Mesh3D(vertex_positions=v_nf, triangle_indices=fmesh.faces,
-                                 vertex_normals=fmesh.vertex_normals,
-                                 vertex_colors=np.tile(color, (n_v, 1))), static=True)
-                rr.log(f"{ROBOT_ROOT}/{side}_finger_2/visual_{part_file}",
-                       rr.Mesh3D(vertex_positions=v_fl, triangle_indices=faces_fl,
-                                 vertex_colors=np.tile(color, (n_v, 1))), static=True)
+                mesh_cache[f"{side}_finger_1_{part_file}"] = {
+                    "v": v_nf, "f": fmesh.faces, "n": fmesh.vertex_normals,
+                    "c": np.tile(color, (n_v, 1))
+                }
+                mesh_cache[f"{side}_finger_2_{part_file}"] = {
+                    "v": v_fl, "f": faces_fl, "n": fmesh.vertex_normals,
+                    "c": np.tile(color, (n_v, 1))
+                }
         except Exception as e:
             print(f"Finger mesh error {part_file}: {e}")
+
+    def log_robot_meshes(is_static=False):
+        """메쉬를 Rerun에 전송 (버퍼 순환 시 재전송하여 신규 접속 클라이언트에도 항상 표시)"""
+        if "base" in mesh_cache:
+            m = mesh_cache["base"]
+            rr.log(f"{ROBOT_ROOT}/base_plate/visual",
+                   rr.Mesh3D(vertex_positions=m["v"], triangle_indices=m["f"],
+                             vertex_normals=m["n"], vertex_colors=m["c"]), static=is_static)
+        for key, m in mesh_cache.items():
+            if key == "base":
+                continue
+            if "finger" in key:
+                parts = key.split("_")
+                side = parts[0]
+                f_idx = parts[2]
+                p_file = "_".join(parts[3:])
+                rr.log(f"{ROBOT_ROOT}/{side}_finger_{f_idx}/visual_{p_file}",
+                       rr.Mesh3D(vertex_positions=m["v"], triangle_indices=m["f"],
+                                 vertex_normals=m["n"], vertex_colors=m["c"]), static=is_static)
+            else:
+                rr.log(f"{ROBOT_ROOT}/{key}/visual",
+                       rr.Mesh3D(vertex_positions=m["v"], triangle_indices=m["f"],
+                                 vertex_normals=m["n"], vertex_colors=m["c"]), static=is_static)
+
+    # 초기 1회 로깅
+    log_robot_meshes(is_static=True)
 
     # --- 관절 스위프 설정 ---
     SWEEP_DURATION = 4.0
@@ -141,12 +191,16 @@ def run_sim():
     for cam_name in ("cam_top", "cam_front", "cam_left_wrist", "cam_right_wrist"):
         cid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_CAMERA, cam_name)
         cam_ids[cam_name] = cid
-        print(f"  Camera '{cam_name}': id={cid}")
 
     # --- 메인 루프 ---
-    CAM_RENDER_EVERY = 3  # 카메라는 3프레임마다 1회 렌더 (약 10fps)
+    CAM_RENDER_EVERY = 3  # 카메라는 3프레임마다 1회 렌더
     start_time = time.time()
     frame = 0
+
+    # 연결 관계 정의 (스켈레톤 라인용)
+    left_chain = ["shoulder_block", "left_base_link", "left_link1", "left_link2", "left_link3", "left_link4", "left_link5", "left_link6", "left_link7", "left_finger_1"]
+    right_chain = ["shoulder_block", "right_base_link", "right_link1", "right_link2", "right_link3", "right_link4", "right_link5", "right_link6", "right_link7", "right_finger_1"]
+
     while True:
         t = time.time() - start_time
         cycle_t = t % (SWEEP_DURATION * len(sweep_items))
@@ -166,47 +220,67 @@ def run_sim():
 
         mujoco.mj_kinematics(model, data)
 
-        # 시간 인덱스 설정: 프레임 시퀀스로 덮어쓰기 → 메모리 누적 방지
+        # 시간 인덱스 설정
         rr.set_time("sim", sequence=frame)
 
         rr.log("status/sweep", rr.TextDocument(
             f"[{item_idx+1}/{len(sweep_items)}] {label}\n"
-            f"qpos = {target:+.3f}   range = [{lo:+.3f}, {hi:+.3f}]"
+            f"qpos = {target:+.3f} rad   range = [{lo:+.3f}, {hi:+.3f}]"
         ))
 
-        # Body transform 스트리밍
+        # Body transform 스트리밍 (axis_length를 부여하여 관절 3D 축 표시)
+        body_positions = {}
         for i in range(model.nbody):
             b_name = model.body(i).name
             if not b_name or b_name == "world":
                 continue
             pos  = data.xpos[i]
             quat = data.xquat[i]
+            body_positions[b_name] = pos
             rr.log(f"{ROBOT_ROOT}/{b_name}",
                    rr.Transform3D(translation=pos,
                                   rotation=rr.Quaternion(xyzw=[quat[1], quat[2], quat[3], quat[0]])))
 
-        # GPU EGL 카메라 렌더링 (CAM_RENDER_EVERY 프레임마다 1회)
+        # 로봇 뼈대 (Skeleton Bone Lines) 로깅: 항상 선명한 로봇 구조 보장
+        l_pts = [body_positions[b] for b in left_chain if b in body_positions]
+        if len(l_pts) > 1:
+            rr.log("world/skeleton/left_arm", rr.LineStrips3D([l_pts], colors=[[56, 189, 248]], radii=[0.012]))
+
+        r_pts = [body_positions[b] for b in right_chain if b in body_positions]
+        if len(r_pts) > 1:
+            rr.log("world/skeleton/right_arm", rr.LineStrips3D([r_pts], colors=[[244, 63, 94]], radii=[0.012]))
+
+        # 베이스 필러 라인
+        if "base_plate" in body_positions and "shoulder_block" in body_positions:
+            rr.log("world/skeleton/torso", rr.LineStrips3D([[body_positions["base_plate"], body_positions["shoulder_block"]]],
+                                                         colors=[[200, 200, 200]], radii=[0.02]))
+
+        # 90프레임마다 메쉬 재송신 (신규 웹 접속자가 언제 들어와도 메쉬가 즉시 나타나도록 보장)
+        if frame > 0 and frame % 90 == 0:
+            log_robot_meshes(is_static=False)
+
+        # GPU EGL 카메라 렌더링
         if frame % CAM_RENDER_EVERY == 0:
             mujoco.mj_fwdPosition(model, data)
 
             renderer_top.update_scene(data, camera="cam_top")
             img = renderer_top.render()
-            rr.log("cameras/top", rr.Image(img))
+            rr.log("cameras/top", rr.Image(img).compress(jpeg_quality=75))
             del img
 
             renderer_front.update_scene(data, camera="cam_front")
             img = renderer_front.render()
-            rr.log("cameras/front", rr.Image(img))
+            rr.log("cameras/front", rr.Image(img).compress(jpeg_quality=75))
             del img
 
             renderer_lw.update_scene(data, camera="cam_left_wrist")
             img = renderer_lw.render()
-            rr.log("cameras/left_wrist", rr.Image(img))
+            rr.log("cameras/left_wrist", rr.Image(img).compress(jpeg_quality=75))
             del img
 
             renderer_rw.update_scene(data, camera="cam_right_wrist")
             img = renderer_rw.render()
-            rr.log("cameras/right_wrist", rr.Image(img))
+            rr.log("cameras/right_wrist", rr.Image(img).compress(jpeg_quality=75))
             del img
 
         # 300프레임마다 GC 강제 실행

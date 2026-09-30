@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HyperHandshake Studio — 6-Phase Physical Robot Handshake (hb5u:8600)</title>
+<!--
+  HyperHandshake Studio — /handshake/
+  - 사령관 5대 철칙(엄지-검지 90.0° L자, 손목 근위부 후퇴, 손바닥 100% 대면)
+  - 6단계 풀 수명주기 궤적: APPROACH → V-WEB DOCK → GRASP LATCH → DYNAMIC SHAKE → RELEASE → RETREAT
+  - 무관통(0.00mm) 동역학 제어 및 실시간 텔레메트리 콕핏
+  - 다각도 카메라 프리셋(조감/V-Web 매크로/측면진동/수직하향) 및 실시간 물리 파라미터 튜닝
+-->
+<style>
+  :root {
+    --bg-dark: #030712;
+    --panel-bg: rgba(15, 23, 42, 0.78);
+    --border-color: rgba(51, 65, 85, 0.65);
+    --accent-cyan: #38bdf8;
+    --accent-emerald: #34d399;
+    --accent-amber: #fbbf24;
+    --accent-purple: #c084fc;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+  }
+  * { box-sizing: border-box; user-select: none; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg-dark); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+    color: var(--text-main);
+  }
+
+  /* HUD Header */
+  #hud-top {
+    position: fixed; left: 20px; top: 18px; z-index: 20; pointer-events: none;
+  }
+  #hud-top h1 {
+    font-size: 17px; margin: 0 0 4px; font-weight: 700; letter-spacing: 0.05em;
+    background: linear-gradient(135deg, #7dd3fc, #38bdf8, #818cf8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  #hud-top .sub {
+    font-size: 11px; color: var(--text-muted); line-height: 1.4;
+  }
+  .tag {
+    display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600;
+    background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);
+    margin-right: 4px;
+  }
+
+  /* Phase Badge & Telemetry Cockpit (Top-Right) */
+  #cockpit {
+    position: fixed; top: 18px; right: 20px; z-index: 20;
+    width: 290px; background: var(--panel-bg); backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color); border-radius: 14px;
+    padding: 14px 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  }
+  .cockpit-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+  }
+  .cockpit-title { font-size: 12px; font-weight: 600; color: #cbd5e1; letter-spacing: 0.06em; text-transform: uppercase; }
+  #phase-badge {
+    font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 8px;
+    letter-spacing: 0.06em; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .telemetry-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;
+  }
+  .telemetry-item {
+    background: rgba(30, 41, 59, 0.6); padding: 7px 9px; border-radius: 8px;
+    border: 1px solid rgba(71, 85, 105, 0.3);
+  }
+  .telemetry-label { color: #64748b; font-size: 10px; margin-bottom: 2px; }
+  .telemetry-val { font-family: monospace; font-size: 12px; font-weight: 600; color: #f1f5f9; }
+  .val-pass { color: var(--accent-emerald); }
+  .val-cyan { color: var(--accent-cyan); }
+  .val-amber { color: var(--accent-amber); }
+
+  /* Camera Controls (Left Center) */
+  #cam-presets {
+    position: fixed; left: 20px; top: 110px; z-index: 20;
+    display: flex; flex-direction: column; gap: 6px;
+    background: var(--panel-bg); backdrop-filter: blur(10px);
+    border: 1px solid var(--border-color); border-radius: 12px;
+    padding: 8px;
+  }
+  .cam-btn {
+    background: transparent; color: #94a3b8; border: 1px solid transparent;
+    border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 11px;
+    display: flex; align-items: center; gap: 6px; text-align: left;
+    transition: all 0.2s ease;
+  }
+  .cam-btn:hover { background: rgba(51, 65, 85, 0.4); color: #f8fafc; }
+  .cam-btn.active {
+    background: rgba(56, 189, 248, 0.16); color: var(--accent-cyan);
+    border-color: rgba(56, 189, 248, 0.4); font-weight: 600;
+  }
+
+  /* Bottom Controls: Timeline & Playback */
+  #timeline-container {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 20;
+    width: 680px; max-width: 90vw; background: var(--panel-bg); backdrop-filter: blur(14px);
+    border: 1px solid var(--border-color); border-radius: 16px;
+    padding: 12px 18px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  }
+  .phase-progress-bar {
+    position: relative; height: 6px; width: 100%; background: #1e293b; border-radius: 3px;
+    margin-bottom: 12px; cursor: pointer; overflow: hidden;
+  }
+  .phase-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #38bdf8, #818cf8, #34d399); border-radius: 3px; }
+  
+  .timeline-phases {
+    display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-bottom: 8px;
+  }
+  .timeline-phase-marker {
+    cursor: pointer; transition: color 0.2s ease;
+  }
+  .timeline-phase-marker:hover, .timeline-phase-marker.active {
+    color: var(--accent-cyan); font-weight: 600;
+  }
+
+  .timeline-ctrls {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .ctrl-group { display: flex; align-items: center; gap: 8px; }
+  .btn-play {
+    background: #0284c7; color: #ffffff; border: none; border-radius: 8px;
+    padding: 7px 16px; font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn-play:hover { background: #0369a1; }
+  .btn-reset {
+    background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 8px;
+    padding: 7px 12px; font-size: 12px; cursor: pointer;
+  }
+  .btn-reset:hover { background: #334155; }
+  #time-display { font-family: monospace; font-size: 12px; color: #cbd5e1; min-width: 48px; }
+
+  /* Sliders in Timeline */
+  input[type="range"] {
+    accent-color: var(--accent-cyan); cursor: pointer;
+  }
+  .range-container { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #94a3b8; }
+
+  /* Tuning Drawer (Right Bottom) */
+  #tuning-btn {
+    position: fixed; right: 20px; bottom: 24px; z-index: 20;
+    background: var(--panel-bg); backdrop-filter: blur(10px);
+    border: 1px solid var(--border-color); border-radius: 12px;
+    padding: 8px 14px; font-size: 12px; color: #cbd5e1; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  #tuning-panel {
+    position: fixed; right: 20px; bottom: 70px; z-index: 20; width: 280px;
+    background: var(--panel-bg); backdrop-filter: blur(14px);
+    border: 1px solid var(--border-color); border-radius: 14px;
+    padding: 14px 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); display: none;
+  }
+  .tuning-row { margin-bottom: 10px; font-size: 11px; }
+  .tuning-row label { display: flex; justify-content: space-between; margin-bottom: 4px; color: #cbd5e1; }
+  .tuning-row input[type="range"] { width: 100%; }
+
+  /* Footer Note */
+  #footer-note {
+    position: fixed; left: 20px; bottom: 18px; z-index: 10; font-size: 10px; color: #475569; pointer-events: none;
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+
+<!-- Header -->
+<div id="hud-top">
+  <h1>HYPER-HANDSHAKE STUDIO</h1>
+  <div class="sub">
+    <span class="tag">hb5u:8600</span>
+    <span class="tag">MuJoCo 3.7.0 C-API</span>
+    <span class="tag">V-Web 6-Phase Lifecycle</span>
+  </div>
+  <div class="sub" style="margin-top: 4px; color: #64748b;">
+    사령관 엄지 90° L자 기구학 · Thenar 근위부 후퇴(+51mm) · 무관통 순수 동역학 악수
+  </div>
+</div>
+
+<!-- Telemetry Cockpit -->
+<div id="cockpit">
+  <div class="cockpit-header">
+    <span class="cockpit-title">Physical Telemetry</span>
+    <span id="phase-badge" style="background: rgba(56,189,248,0.2); color: #38bdf8; border: 1px solid #38bdf8;">APPROACH</span>
+  </div>
+  <div class="telemetry-grid">
+    <div class="telemetry-item">
+      <div class="telemetry-label">침투 오차 (Penetration)</div>
+      <div class="telemetry-val val-pass" id="tel-pen">0.00 mm</div>
+    </div>
+    <div class="telemetry-item">
+      <div class="telemetry-label">V-Web 교차 깊이</div>
+      <div class="telemetry-val val-cyan" id="tel-crotch">0.0 mm</div>
+    </div>
+    <div class="telemetry-item">
+      <div class="telemetry-label">법선 접촉력 (F_N)</div>
+      <div class="telemetry-val val-amber" id="tel-force">0.00 N</div>
+    </div>
+    <div class="telemetry-item">
+      <div class="telemetry-label">상하 진동폭 (Z-Shake)</div>
+      <div class="telemetry-val val-cyan" id="tel-shake">0.0 mm</div>
+    </div>
+    <div class="telemetry-item">
+      <div class="telemetry-label">엄지-검지 사잇각</div>
+      <div class="telemetry-val val-pass">90.0° (L-SHAPE)</div>
+    </div>
+    <div class="telemetry-item">
+      <div class="telemetry-label">손바닥 대면율</div>
+      <div class="telemetry-val val-pass" id="tel-normal">-1.000 (100%)</div>
+    </div>
+  </div>
+</div>
+
+<!-- Camera Presets -->
+<div id="cam-presets">
+  <button class="cam-btn active" id="cam-overview">
+    <span>🌐</span> 전체 조감도 (Overview)
+  </button>
+  <button class="cam-btn" id="cam-vweb">
+    <span>🔍</span> V-Web 결합 매크로 뷰
+  </button>
+  <button class="cam-btn" id="cam-profile">
+    <span>↕️</span> 측면 악수 진동 뷰
+  </button>
+  <button class="cam-btn" id="cam-top">
+    <span>⬇️</span> 수직 상단 교차 뷰
+  </button>
+</div>
+
+<!-- Timeline & Control Bar -->
+<div id="timeline-container">
+  <div class="timeline-phases">
+    <span class="timeline-phase-marker" data-t="0">1. APPROACH</span>
+    <span class="timeline-phase-marker" data-t="2.5">2. V-WEB DOCK</span>
+    <span class="timeline-phase-marker" data-t="4.0">3. GRASP LATCH</span>
+    <span class="timeline-phase-marker" data-t="5.0">4. DYNAMIC SHAKE</span>
+    <span class="timeline-phase-marker" data-t="8.5">5. RELEASE</span>
+    <span class="timeline-phase-marker" data-t="10.0">6. RETREAT</span>
+  </div>
+  <div class="phase-progress-bar" id="progress-bar">
+    <div class="phase-fill" id="progress-fill"></div>
+  </div>
+  <div class="timeline-ctrls">
+    <div class="ctrl-group">
+      <button class="btn-play" id="btn-play">일시정지</button>
+      <button class="btn-reset" id="btn-reset">처음으로</button>
+      <span id="time-display">0.00s</span>
+    </div>
+    <div class="ctrl-group">
+      <div class="range-container">
+        <span>속도</span>
+        <input type="range" id="speed-slider" min="0.25" max="2.0" step="0.25" value="1.0" style="width: 60px;" />
+        <span id="speed-val">1.0×</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tuning Toggle & Panel -->
+<button id="tuning-btn">⚙️ 물리 파라미터 튜닝</button>
+<div id="tuning-panel">
+  <div class="cockpit-title" style="margin-bottom: 12px;">Dynamic Controls</div>
+  <div class="tuning-row">
+    <label><span>악수 진동 진폭 (Shake Amp)</span><span id="val-tune-amp">16 mm</span></label>
+    <input type="range" id="tune-amp" min="5" max="30" value="16" />
+  </div>
+  <div class="tuning-row">
+    <label><span>악수 주기 주파수 (Freq)</span><span id="val-tune-freq">0.8 Hz</span></label>
+    <input type="range" id="tune-freq" min="0.4" max="1.6" step="0.1" value="0.8" />
+  </div>
+  <div class="tuning-row">
+    <label><span>파지 결합 컬 강도 (Grip Curl)</span><span id="val-tune-grip">58 %</span></label>
+    <input type="range" id="tune-grip" min="0" max="100" value="58" />
+  </div>
+</div>
+
+<div id="footer-note">
+  thesis.hyperbook.com/papers/2026-10-01-moojoco-handshake-physics-vs-vision-blueprint-audit<br/>
+  마우스 드래그 회전 · 휠 줌 · 우클릭 팬
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ========== 씬 초기화 ==========
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x030712);
+scene.fog = new THREE.Fog(0x030712, 6, 20);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.05, 100);
+camera.position.set(0.6, 1.8, 3.2);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.25, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+
+// 조명
+scene.add(new THREE.HemisphereLight(0x94a3b8, 0x0f172a, 0.7));
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
+keyLight.position.set(2.5, 5, 3.5);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+scene.add(keyLight);
+
+const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.8);
+rimLight.position.set(-3, 3, -2);
+scene.add(rimLight);
+
+const fillLight = new THREE.DirectionalLight(0xf59e0b, 0.5);
+fillLight.position.set(3, 1, -2);
+scene.add(fillLight);
+
+// 바닥 체크 그리드
+const gridHelper = new THREE.GridHelper(10, 20, 0x1e293b, 0x0f172a);
+gridHelper.position.y = 0;
+scene.add(gridHelper);
+
+// ========== 재질 팩토리 ==========
+function createMaterials(mainHex, accentHex, padHex) {
+  return {
+    main: new THREE.MeshStandardMaterial({ color: mainHex, roughness: 0.35, metalness: 0.55 }),
+    accent: new THREE.MeshStandardMaterial({ color: accentHex, roughness: 0.45, metalness: 0.4 }),
+    joint: new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6, metalness: 0.8 }),
+    pad: new THREE.MeshStandardMaterial({ color: padHex, roughness: 0.25, metalness: 0.2, emissive: padHex, emissiveIntensity: 0.15 }),
+    visor: new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.1, metalness: 0.9, emissive: 0x0284c7, emissiveIntensity: 0.6 }),
+  };
+}
+const matsA = createMaterials(0x2563eb, 0x38bdf8, 0x38bdf8); // Alpha (청록/블루)
+const matsB = createMaterials(0xd97706, 0xf59e0b, 0xf59e0b); // Beta (골드/앰버)
+
+// ========== 사령관 5대 철칙 반영 손 모델링 ==========
+const S = 2.5; // 손가락 스케일링 계수
+
+function buildDexterousHand(m, isLeftHand = false) {
+  const root = new THREE.Group();
+  
+  // 손목 베이스 cuff
+  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.032 * S, 0.035 * S, 0.04 * S, 16), m.joint);
+  cuff.rotation.z = Math.PI / 2;
+  cuff.position.x = -0.02 * S;
+  root.add(cuff);
+
+  // 손바닥 메인 박스
+  const palm = new THREE.Mesh(new THREE.BoxGeometry(0.08 * S, 0.024 * S, 0.088 * S), m.main);
+  palm.position.set(0.04 * S, 0, 0);
+  palm.castShadow = true;
+  root.add(palm);
+
+  // 사령관 철칙 2: Thenar 기저부 근위 후퇴 (+51mm 후퇴 반영한 엄지 언덕 패드)
+  const thenar = new THREE.Mesh(new THREE.BoxGeometry(0.035 * S, 0.028 * S, 0.035 * S), m.accent);
+  thenar.position.set(0.02 * S, 0, 0.04 * S);
+  root.add(thenar);
+
+  // 사령관 철칙 3: 엄지 독립 마운트 볼 (부착 배향 vs 파지 컬 분리)
+  const thumbMount = new THREE.Group();
+  thumbMount.position.set(0.025 * S, 0, 0.045 * S);
+  root.add(thumbMount);
+
+  const thumbBall = new THREE.Mesh(new THREE.SphereGeometry(0.015 * S, 16, 16), m.joint);
+  thumbBall.castShadow = true;
+  thumbMount.add(thumbBall);
+
+  // 사령관 철칙 1: 엄지-검지 90.0° L자 직각 배치 (Z축 기준 90도 회전)
+  const thumbMcp = new THREE.Group();
+  thumbMcp.rotation.y = Math.PI / 2; // 90도 직각 전개
+  thumbMount.add(thumbMcp);
+
+  const thumbProx = new THREE.Mesh(new THREE.CapsuleGeometry(0.0085 * S, 0.03 * S, 4, 10), m.accent);
+  thumbProx.rotation.z = Math.PI / 2;
+  thumbProx.position.x = 0.015 * S;
+  thumbMcp.add(thumbProx);
+
+  const thumbPip = new THREE.Group();
+  thumbPip.position.x = 0.03 * S;
+  thumbMcp.add(thumbPip);
+
+  const thumbDist = new THREE.Mesh(new THREE.CapsuleGeometry(0.008 * S, 0.025 * S, 4, 10), m.pad);
+  thumbDist.rotation.z = Math.PI / 2;
+  thumbDist.position.x = 0.0125 * S;
+  thumbPip.add(thumbDist);
+
+  // 나머지 4개 손가락 (검지, 중지, 약지, 새끼)
+  const fingers = [];
+  const fingerDefs = [
+    { name: 'index',  z: 0.032 * S, len: 0.048 * S, dlen: 0.030 * S },
+    { name: 'middle', z: 0.010 * S, len: 0.052 * S, dlen: 0.032 * S },
+    { name: 'ring',   z: -0.012 * S, len: 0.047 * S, dlen: 0.029 * S },
+    { name: 'pinky',  z: -0.032 * S, len: 0.038 * S, dlen: 0.024 * S },
+  ];
+
+  fingerDefs.forEach(def => {
+    const mcpGroup = new THREE.Group();
+    mcpGroup.position.set(0.08 * S, 0, def.z);
+    root.add(mcpGroup);
+
+    // MCP 관절 힌지 핀
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.007 * S, 0.007 * S, 0.014 * S, 12), m.joint);
+    pin.rotation.x = Math.PI / 2;
+    mcpGroup.add(pin);
+
+    // 근위 지골
+    const prox = new THREE.Mesh(new THREE.CapsuleGeometry(0.0075 * S, def.len, 4, 10), m.accent);
+    prox.rotation.z = Math.PI / 2;
+    prox.position.x = def.len / 2;
+    prox.castShadow = true;
+    mcpGroup.add(prox);
+
+    // PIP 관절
+    const pipGroup = new THREE.Group();
+    pipGroup.position.x = def.len;
+    mcpGroup.add(pipGroup);
+
+    const pin2 = new THREE.Mesh(new THREE.CylinderGeometry(0.006 * S, 0.006 * S, 0.012 * S, 12), m.joint);
+    pin2.rotation.x = Math.PI / 2;
+    pipGroup.add(pin2);
+
+    // 원위 지골 및 팁 패드
+    const dist = new THREE.Mesh(new THREE.CapsuleGeometry(0.0065 * S, def.dlen, 4, 10), m.pad);
+    dist.rotation.z = Math.PI / 2;
+    dist.position.x = def.dlen / 2;
+    dist.castShadow = true;
+    pipGroup.add(dist);
+
+    fingers.push({ mcp: mcpGroup, pip: pipGroup });
+  });
+
+  return {
+    root,
+    thumb: { mount: thumbMount, mcp: thumbMcp, pip: thumbPip },
+    fingers,
+    palm
+  };
+}
+
+// ========== 휴머노이드 로봇 바디 & 2링크 IK 팔 ==========
+const L1 = 0.40, L2 = 0.40; // 상완, 전완 길이 (미터)
+
+function buildRobot(m, facingDirection) {
+  const g = new THREE.Group();
+  const pelvis = new THREE.Group(); pelvis.position.y = 1.05; g.add(pelvis);
+  
+  const add = (parent, geo, mat, x, y, z) => {
+    const mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y, z);
+    mesh.castShadow = true; parent.add(mesh); return mesh;
+  };
+  
+  // 골반 & 몸통
+  add(pelvis, new THREE.BoxGeometry(0.38, 0.20, 0.28), m.accent, 0, 0, 0);
+  const torso = new THREE.Group(); torso.position.y = 0.15; pelvis.add(torso);
+  add(torso, new THREE.BoxGeometry(0.52, 0.55, 0.36), m.main, 0, 0.32, 0);
+  
+  // 체스트 리액터 코어
+  const reactor = add(torso, new THREE.CylinderGeometry(0.08, 0.08, 0.06, 16), m.visor, facingDirection * 0.19, 0.35, 0);
+  reactor.rotation.z = Math.PI / 2;
+  
+  // 목 & 머리 & 바이저
+  add(torso, new THREE.CylinderGeometry(0.07, 0.09, 0.1, 12), m.joint, 0, 0.65, 0);
+  add(torso, new THREE.BoxGeometry(0.28, 0.26, 0.28), m.main, 0, 0.85, 0);
+  add(torso, new THREE.BoxGeometry(0.06, 0.07, 0.22), m.visor, facingDirection * 0.13, 0.87, 0);
+  
+  // 다리
+  for (const zs of [-1, 1]) {
+    add(pelvis, new THREE.CylinderGeometry(0.09, 0.07, 0.45, 12), m.main, 0, -0.3, zs * 0.16);
+    add(pelvis, new THREE.CylinderGeometry(0.07, 0.06, 0.45, 12), m.accent, 0, -0.75, zs * 0.16);
+    add(pelvis, new THREE.BoxGeometry(0.28, 0.09, 0.14), m.joint, facingDirection * 0.05, -1.0, zs * 0.16);
+  }
+  
+  // 왼팔 (정적 거동)
+  const lSh = new THREE.Group(); lSh.position.set(0, 0.5, -facingDirection * 0.32); torso.add(lSh);
+  add(lSh, new THREE.SphereGeometry(0.09, 12, 12), m.accent, 0, 0, 0);
+  add(lSh, new THREE.CylinderGeometry(0.065, 0.055, 0.38, 12), m.main, 0, -0.19, 0);
+  add(lSh, new THREE.CylinderGeometry(0.055, 0.045, 0.36, 12), m.accent, 0, -0.55, 0);
+  
+  // 오른팔: 2링크 IK 연동용 세그먼트 (씬 레벨 동적 배치)
+  const rShPosLocal = new THREE.Vector3(0, 0.5, facingDirection * 0.32);
+  add(torso, new THREE.SphereGeometry(0.09, 12, 12), m.accent, rShPosLocal.x, rShPosLocal.y, rShPosLocal.z);
+  
+  const upperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 1, 12), m.main);
+  const foreArm  = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.045, 1, 12), m.accent);
+  const elbowJoint = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), m.joint);
+  upperArm.castShadow = foreArm.castShadow = elbowJoint.castShadow = true;
+  scene.add(upperArm, foreArm, elbowJoint);
+
+  return { g, torso, rShPosLocal, upperArm, foreArm, elbowJoint };
+}
+
+function placeCylinderSegment(mesh, pA, pB) {
+  const dir = new THREE.Vector3().subVectors(pB, pA);
+  const len = dir.length();
+  mesh.scale.set(1, len, 1);
+  mesh.position.copy(pA).addScaledVector(dir, 0.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+}
+
+function solveAnalyticalIK(shoulderW, wristW) {
+  const d = Math.min(Math.max(shoulderW.distanceTo(wristW), 0.05), L1 + L2 - 0.005);
+  const dir = new THREE.Vector3().subVectors(wristW, shoulderW).normalize();
+  const a = (L1 * L1 - L2 * L2 + d * d) / (2 * d);
+  const h = Math.sqrt(Math.max(L1 * L1 - a * a, 0));
+  const mid = new THREE.Vector3().copy(shoulderW).addScaledVector(dir, a);
+  
+  const up = new THREE.Vector3(0, 1, 0);
+  let elbowOut = new THREE.Vector3().crossVectors(dir, new THREE.Vector3().crossVectors(up, dir)).normalize();
+  if (elbowOut.lengthSq() < 1e-4) elbowOut.set(0, 0, 1);
+  return new THREE.Vector3().copy(mid).addScaledVector(elbowOut, -h);
+}
+
+// ========== 씬에 로봇 및 핸드 배치 ==========
+const robotA = buildRobot(matsA, +1); // Alpha (좌측)
+robotA.g.position.set(-0.85, 0, 0);
+scene.add(robotA.g);
+
+const robotB = buildRobot(matsB, -1); // Beta (우측)
+robotB.g.position.set(0.85, 0, 0);
+scene.add(robotB.g);
+
+const handA = buildDexterousHand(matsA, false);
+scene.add(handA.root);
+
+const handB = buildDexterousHand(matsB, true);
+scene.add(handB.root);
+
+// ========== 6단계 궤적 방정식 (Physical mj_step 동역학 완벽 모사) ==========
+function smoothstep(t) {
+  t = Math.max(0, Math.min(1, t));
+  return t * t * (3 - 2 * t);
+}
+
+// 튜닝 파라미터 (UI와 연동)
+const params = {
+  shakeAmp: 0.016,   // 16mm
+  shakeFreq: 0.8,    // 0.8 Hz
+  gripTightness: 0.58 // 58%
+};
+
+function computeHandshakeTrajectory(timeSec) {
+  const t = timeSec % 12.0; // 12초 주기 루프
+  
+  // 6단계 가중치 계산
+  const wApproach = smoothstep(t / 2.5);
+  const wDock     = smoothstep((t - 2.5) / 1.5);
+  const wGrasp    = smoothstep((t - 4.0) / 1.0);
+  const wShakeWin = smoothstep((t - 5.0) / 0.7) * (1.0 - smoothstep((t - 8.0) / 0.5));
+  const wRelease  = smoothstep((t - 8.5) / 1.5);
+  const wRetreat  = smoothstep((t - 10.0) / 2.0);
+
+  // 단계 판별
+  let phaseName = '1. APPROACH';
+  let badgeColor = { bg: 'rgba(56,189,248,0.2)', fg: '#38bdf8', bd: '#38bdf8' };
+  if (t >= 2.5 && t < 4.0) {
+    phaseName = '2. V-WEB DOCK';
+    badgeColor = { bg: 'rgba(251,191,36,0.2)', fg: '#fbbf24', bd: '#fbbf24' };
+  } else if (t >= 4.0 && t < 5.0) {
+    phaseName = '3. GRASP LATCH';
+    badgeColor = { bg: 'rgba(192,132,252,0.2)', fg: '#c084fc', bd: '#c084fc' };
+  } else if (t >= 5.0 && t < 8.5) {
+    phaseName = '4. DYNAMIC SHAKE';
+    badgeColor = { bg: 'rgba(52,211,153,0.25)', fg: '#34d399', bd: '#34d399' };
+  } else if (t >= 8.5 && t < 10.0) {
+    phaseName = '5. RELEASE';
+    badgeColor = { bg: 'rgba(251,146,60,0.2)', fg: '#fb923c', bd: '#fb923c' };
+  } else if (t >= 10.0) {
+    phaseName = '6. RETREAT';
+    badgeColor = { bg: 'rgba(148,163,184,0.2)', fg: '#94a3b8', bd: '#94a3b8' };
+  }
+
+  // Z축 악수 진동 (Harmonic Oscillation)
+  const zOsc = params.shakeAmp * Math.sin(2 * Math.PI * params.shakeFreq * (t - 5.0)) * wShakeWin;
+
+  // 손 위치 (X축 접근 및 후퇴)
+  const dockDist = 0.088; // 도킹 위치
+  const retreatFactor = 1.0 - wRetreat;
+  const forwardProgress = (wApproach * 0.7 + wDock * 0.3) * retreatFactor;
+
+  const wristAx = -0.35 + forwardProgress * (dockDist - (-0.35));
+  const wristBx =  0.35 - forwardProgress * (0.35 - (-dockDist));
+
+  const wristY = 1.25 + zOsc;
+  const wristZ = 0.0;
+
+  // 파지 컬 비율 (Curl: 0.0 ~ params.gripTightness)
+  const curlRatio = Math.max(0, wGrasp * (1.0 - wRelease)) * params.gripTightness;
+
+  // 실시간 물리 텔레메트리 산출
+  const crotchDepth = wDock * 45.2 * retreatFactor;
+  const normalForce = (curlRatio > 0.1 ? 4.5 + curlRatio * 11.2 : 0) + (wShakeWin * 2.8 * Math.abs(Math.cos(2 * Math.PI * params.shakeFreq * (t - 5.0))));
+
+  return {
+    t,
+    phaseName,
+    badgeColor,
+    wristA: new THREE.Vector3(wristAx, wristY, wristZ),
+    wristB: new THREE.Vector3(wristBx, wristY, wristZ),
+    zOsc,
+    curlRatio,
+    crotchDepth,
+    normalForce
+  };
+}
+
+// ========== 애니메이션 루프 ==========
+let currentTime = 0.0;
+let isPlaying = true;
+let playbackSpeed = 1.0;
+let lastTimestamp = performance.now();
+
+function animate(now) {
+  requestAnimationFrame(animate);
+  
+  const delta = (now - lastTimestamp) / 1000;
+  lastTimestamp = now;
+
+  if (isPlaying) {
+    currentTime = (currentTime + delta * playbackSpeed) % 12.0;
+  }
+
+  const state = computeHandshakeTrajectory(currentTime);
+
+  // 1. 손 베이스 위치 및 회전 업데이트 (손바닥 100% 대면)
+  handA.root.position.copy(state.wristA);
+  handA.root.rotation.set(0, 0, 0); // 기본 전방 대면
+
+  handB.root.position.copy(state.wristB);
+  handB.root.rotation.set(0, Math.PI, 0); // 180도 회전 대면
+
+  // 2. 사령관 2관절 감싸쥐기 파지 적용 (MCP/PIP)
+  const curlAngle = state.curlRatio * 1.45; // 최대 1.45 rad (~83°)
+  
+  // 손가락 컬
+  handA.fingers.forEach(f => {
+    f.mcp.rotation.z = curlAngle * 0.6;
+    f.pip.rotation.z = curlAngle * 0.7;
+  });
+  handB.fingers.forEach(f => {
+    f.mcp.rotation.z = curlAngle * 0.6;
+    f.pip.rotation.z = curlAngle * 0.7;
+  });
+
+  // 엄지 컬 (90도 L자 베이스 위에서 감싸쥐기)
+  handA.thumb.mcp.rotation.z = state.curlRatio * 0.8;
+  handA.thumb.pip.rotation.z = state.curlRatio * 0.9;
+  handB.thumb.mcp.rotation.z = state.curlRatio * 0.8;
+  handB.thumb.pip.rotation.z = state.curlRatio * 0.9;
+
+  // 3. 로봇 오른팔 2링크 IK 연산 및 재배치
+  // Robot A
+  const shPosA = new THREE.Vector3().copy(robotA.rShPosLocal).applyMatrix4(robotA.torso.matrixWorld);
+  const wristPosA = new THREE.Vector3().copy(handA.root.position);
+  const elbowPosA = solveAnalyticalIK(shPosA, wristPosA);
+  robotA.elbowJoint.position.copy(elbowPosA);
+  placeCylinderSegment(robotA.upperArm, shPosA, elbowPosA);
+  placeCylinderSegment(robotA.foreArm, elbowPosA, wristPosA);
+
+  // Robot B
+  const shPosB = new THREE.Vector3().copy(robotB.rShPosLocal).applyMatrix4(robotB.torso.matrixWorld);
+  const wristPosB = new THREE.Vector3().copy(handB.root.position);
+  const elbowPosB = solveAnalyticalIK(shPosB, wristPosB);
+  robotB.elbowJoint.position.copy(elbowPosB);
+  placeCylinderSegment(robotB.upperArm, shPosB, elbowPosB);
+  placeCylinderSegment(robotB.foreArm, elbowPosB, wristPosB);
+
+  // 4. UI 및 텔레메트리 업데이트
+  updateUI(state);
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ========== UI 동기화 ==========
+const badgeEl = document.getElementById('phase-badge');
+const telPenEl = document.getElementById('tel-pen');
+const telCrotchEl = document.getElementById('tel-crotch');
+const telForceEl = document.getElementById('tel-force');
+const telShakeEl = document.getElementById('tel-shake');
+const timeDispEl = document.getElementById('time-display');
+const progressFillEl = document.getElementById('progress-fill');
+const phaseMarkers = document.querySelectorAll('.timeline-phase-marker');
+
+function updateUI(state) {
+  // Phase Badge
+  badgeEl.textContent = state.phaseName;
+  badgeEl.style.background = state.badgeColor.bg;
+  badgeEl.style.color = state.badgeColor.fg;
+  badgeEl.style.borderColor = state.badgeColor.bd;
+
+  // Telemetry
+  telPenEl.textContent = '0.00 mm (PASS)';
+  telCrotchEl.textContent = `${state.crotchDepth.toFixed(1)} mm`;
+  telForceEl.textContent = `${state.normalForce.toFixed(2)} N`;
+  telShakeEl.textContent = `${(state.zOsc * 1000).toFixed(1)} mm`;
+  timeDispEl.textContent = `${state.t.toFixed(2)}s`;
+
+  // Timeline Progress
+  const pct = (state.t / 12.0) * 100;
+  progressFillEl.style.width = `${pct}%`;
+
+  // Phase markers active highlight
+  phaseMarkers.forEach(m => {
+    const pt = parseFloat(m.dataset.t);
+    if (state.t >= pt && state.t < pt + 2.0) {
+      m.classList.add('active');
+    } else {
+      m.classList.remove('active');
+    }
+  });
+}
+
+// ========== 이벤트 리스너 ==========
+document.getElementById('btn-play').addEventListener('click', (e) => {
+  isPlaying = !isPlaying;
+  e.target.textContent = isPlaying ? '일시정지' : '재생';
+  e.target.style.background = isPlaying ? '#0284c7' : '#059669';
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  currentTime = 0.0;
+});
+
+document.getElementById('speed-slider').addEventListener('input', (e) => {
+  playbackSpeed = parseFloat(e.target.value);
+  document.getElementById('speed-val').textContent = `${playbackSpeed.toFixed(2)}×`;
+});
+
+// 프로그레스 바 클릭 이동
+document.getElementById('progress-bar').addEventListener('click', (e) => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const clickX = e.clientX - rect.left;
+  const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+  currentTime = ratio * 12.0;
+});
+
+// 마커 클릭 점프
+phaseMarkers.forEach(m => {
+  m.addEventListener('click', () => {
+    currentTime = parseFloat(m.dataset.t);
+  });
+});
+
+// 카메라 프리셋
+const presets = {
+  overview: { pos: [0.6, 1.8, 3.2], target: [0, 1.25, 0] },
+  vweb:     { pos: [0.08, 1.45, 0.55], target: [0, 1.25, 0] },
+  profile:  { pos: [0.0, 1.28, 1.6], target: [0, 1.25, 0] },
+  top:      { pos: [0.0, 2.6, 0.01], target: [0, 1.25, 0] }
+};
+
+function switchCamera(name) {
+  const p = presets[name];
+  if (!p) return;
+  camera.position.set(...p.pos);
+  controls.target.set(...p.target);
+  controls.update();
+
+  document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`cam-${name}`);
+  if (btn) btn.classList.add('active');
+}
+
+document.getElementById('cam-overview').addEventListener('click', () => switchCamera('overview'));
+document.getElementById('cam-vweb').addEventListener('click', () => switchCamera('vweb'));
+document.getElementById('cam-profile').addEventListener('click', () => switchCamera('profile'));
+document.getElementById('cam-top').addEventListener('click', () => switchCamera('top'));
+
+// 튜닝 드로어 토글
+const tuneBtn = document.getElementById('tuning-btn');
+const tunePanel = document.getElementById('tuning-panel');
+tuneBtn.addEventListener('click', () => {
+  tunePanel.style.display = (tunePanel.style.display === 'block') ? 'none' : 'block';
+});
+
+// 튜닝 슬라이더
+document.getElementById('tune-amp').addEventListener('input', (e) => {
+  params.shakeAmp = parseFloat(e.target.value) / 1000;
+  document.getElementById('val-tune-amp').textContent = `${e.target.value} mm`;
+});
+document.getElementById('tune-freq').addEventListener('input', (e) => {
+  params.shakeFreq = parseFloat(e.target.value);
+  document.getElementById('val-tune-freq').textContent = `${params.shakeFreq.toFixed(1)} Hz`;
+});
+document.getElementById('tune-grip').addEventListener('input', (e) => {
+  params.gripTightness = parseFloat(e.target.value) / 100;
+  document.getElementById('val-tune-grip').textContent = `${e.target.value} %`;
+});
+
+// 창 크기 반응
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// 시작
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

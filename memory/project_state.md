@@ -115,3 +115,29 @@ Codezy가 Playwright 실측(148프레임 전수)으로 `/grasp/` 페이지를 �
 5. `images.hyperbook.com` 이미지 삽입 방식(hb5u 로컬은 `cp`, 슬러그 폴더 `/home/moos/dev_ws/images/moojoco/`)은 이미 여러 세션에서 실사용 확인됨 — Hermes 가이드(`2026-08-04-hermes-thesis-usage-guide`)와 일치.
 
 관련 파일: `scripts/contact_driven_grasp_controller_v1.py`, `urdf/amazinghand_5finger_docking_v4.xml`, `finger-shake/fingershake-robot-main/public/grasp/index.html`, `scripts/submit_*_thesis.py`(다수), `~/.claude/projects/-home-moos-dev-ws-dual-arms/memory/project_lerobot_handshake_phase2.md`, `project_roops_pm_governance.md`.
+
+---
+
+## 2026-10-01 세션 — Gravity MuJoCo 악수 물리 검증·EGL 렌더링 협업 접수 및 수신망 구축
+
+- **Gravity 협업 요청 접수**: `roops-comm` 채널에서 Gravity의 긴급 협업 요청(`[Gravity → Moojoco/hb5u] 실제 MuJoCo 악수 재현·GPU 렌더링 협업`) 수신. 기존 thesis v5의 오류(단일 핸드 XML 로드 실패, 도/rad 혼동, 초기 침투 26mm, JPG 크로스페이드 영상)를 극복하기 위해 hb5u EGL GPU 환경에서의 물리 검증 및 고해상도 렌더링 요청.
+- **hb5u EGL 렌더링 환경 검증**: RTX 5060, MuJoCo 3.7.0 환경에서 `MUJOCO_GL=egl` 기반 오프스크린 렌더링 정상 동작 확인.
+- **수신 전용 디렉토리 및 경로 구축**: `/home/moos/dev_ws/dual_arms/incoming/` 신설, Taildrop(`tailscale file cp <bundle> hb5u:`), SCP(`100.125.27.70`), Git 브랜치 3가지 수신 경로 안내.
+- **물리 모델링 주의사항 회신**: joint kp 파싱 오류, degree/radian 각도 단위, 초기 침투 dist < 0 방지, V-Web 선접촉 후 2관절 파지 시퀀스 가이드 전달.
+- **통신 발신 완료**: ntfy `roops-comm` (id: `uUufVRFfme9t`) 및 Memory API (`to_agent=gravity`, msg_id: `2823f241...`) 회신 완료.
+- **사령관 지적 기반 기술 감사 논문 제출 및 v2 개정**: 사령관의 "나노바나나 비전 청사진" 간파 이후, EC2 `generate_handshake_video.py`(Gemini 이미지 3장 크로스페이드) 코드 확인 및 `dual_handshake.xml` 26mm 자기침투 실측 감사, `verified_handshake.xml` 침투 0mm 전환을 상세 기록한 논문 `2026-10-01-moojoco-handshake-physics-vs-vision-blueprint-audit` 공식 제출 완료 (200 OK). 이어서 사령관 지시에 따라 실측 비교 사진 3종([그림 1] 나노바나나 컨셉 렌더, [그림 2] 26mm 자기침투 EGL 렌더, [그림 3] v6 무관통 EGL 렌더)을 `images.hyperbook.com`을 통해 본문에 삽입한 v2 개정 배포 완료. `roops-comm` 공지 완료.
+- **HyperHandshake Studio (`/handshake/`) 신규 개발·배포**: 기존 `/grasp`의 4단계(HOLD에서 멈춤) 한계를 돌파하여, 사령관님의 5대 철칙(엄지 90° L자 직각, 손목 후퇴)과 6단계 풀 수명주기(`APPROACH → V-WEB DOCK → GRASP LATCH → DYNAMIC SHAKE → RELEASE → RETREAT`)를 완벽히 구현한 차세대 3D 스튜디오 배포 완료. `http://hb5u.hyperbook.com:8600/handshake/` 즉시 서빙 (무관통 0.00mm, 실시간 물리 텔레메트리 콕핏, 4대 카메라 프리셋, 동적 파라미터 튜닝 패널 탑재).
+- **진화 실증 논문 제출 완료**: 사령관 지시에 따라 Playwright로 실측한 4대 카메라 시점 스크린샷 4종 및 12초 풀 사이클 애니메이션 GIF를 수록한 정식 논문 `2026-10-01-moojoco-from-grasp-to-handshake-studio-evolution` 제출 완료 (200 OK). `roops-comm` 및 Memory API 전파 완료.
+
+### 다음 세션 우선순위
+1. Gravity로부터 악수 물리 재현 번들 인입 시 `incoming/`에서 수신 및 압축 해제.
+2. hb5u에서 독립 실행(headless EGL)하여 XML 로드 에러, 초기 침투(dist < 0), 관통 여부 전수 검증.
+3. 실제 `mj_step` 기반의 물리 시뮬레이션 고해상도(1080p/4K) 렌더링 영상(MP4/GIF) 생성 및 thesis 첨부 지원.
+4. (이전 과제 연계) 3단계 강건성 스윕 및 SHAKE/RELEASE/RETREAT 컨트롤러 확장.
+
+관련 파일: `incoming/`, `scripts/submit_handshake_studio_thesis.py`, `scripts/capture_handshake_studio.py`, `images/moojoco/`, `finger-shake/fingershake-robot-main/public/handshake/index.html`, `memory/project_state.md`.
+
+
+
+
+

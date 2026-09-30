@@ -1,0 +1,214 @@
+<mujoco model="dual_robot_handshake_simulation">
+  <compiler angle="degree" coordinate="local"/>
+
+  <option timestep="0.002" gravity="0 0 -9.81" cone="elliptic"/>
+
+  <visual>
+    <quality shadowsize="2048"/>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.8 0.8 0.8" specular="0.2 0.2 0.2"/>
+  </visual>
+
+  <default>
+    <joint limited="true" damping="0.2" armature="0.003"/>
+    <geom friction="1.5 0.01 0.001" condim="4"/>
+    <position kp="25" forcerange="-4.0 4.0"/>
+  </default>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.2 0.3 0.4" rgb2="0 0 0" width="512" height="512"/>
+    <texture name="plane_tex" type="2d" builtin="checker" rgb1="0.85 0.85 0.85" rgb2="0.7 0.7 0.7" width="512" height="512"/>
+    <material name="plane_mat" texture="plane_tex" texrepeat="5 5" reflectance="0.2"/>
+
+    <!-- Robot A (White/Titanium - Gravity) -->
+    <material name="mat_arm_a" rgba="0.92 0.94 0.96 1.0" specular="0.6"/>
+    <material name="mat_palm_a" rgba="0.28 0.32 0.38 1.0" specular="0.3"/>
+    <material name="mat_finger_a" rgba="0.85 0.55 0.35 1.0" specular="0.2"/>
+    <material name="mat_thumb_a" rgba="0.80 0.45 0.30 1.0" specular="0.2"/>
+
+    <!-- Robot B (Dark Tungsten/Graphite - Ari/Geminy) -->
+    <material name="mat_arm_b" rgba="0.18 0.20 0.22 1.0" specular="0.5"/>
+    <material name="mat_palm_b" rgba="0.22 0.24 0.28 1.0" specular="0.3"/>
+    <material name="mat_finger_b" rgba="0.75 0.50 0.30 1.0" specular="0.2"/>
+    <material name="mat_thumb_b" rgba="0.70 0.40 0.25 1.0" specular="0.2"/>
+
+    <material name="mat_table" rgba="0.88 0.90 0.94 1.0"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.8" dir="0 0 -1" diffuse="0.9 0.9 0.9" specular="0.3 0.3 0.3"/>
+    <geom name="floor" type="plane" size="1.5 1.5 0.05" material="plane_mat"/>
+
+    <!-- 중앙 실험대 -->
+    <body name="bench" pos="0 0 0.08">
+      <geom name="bench_top" type="box" size="0.35 0.25 0.08" material="mat_table"/>
+    </body>
+
+    <!-- ================================================================= -->
+    <!-- [로봇 A: 좌측 화이트/티타늄 핸드 - Gravity]                       -->
+    <!-- ================================================================= -->
+    <body name="robot_a_wrist" pos="-0.085 0 0.26" euler="0 10 0">
+      <geom name="a_forearm" type="capsule" fromto="-0.08 0 0 0 0 0" size="0.035" material="mat_arm_a"/>
+      <geom name="a_palm" type="box" size="0.040 0.040 0.015" pos="0.035 0 0" material="mat_palm_a"/>
+      <geom name="a_thenar" type="sphere" size="0.020" pos="0.045 -0.032 -0.005" material="mat_palm_a"/>
+
+      <!-- 대립 엄지 (3-DoF) -->
+      <body name="a_thumb_base" pos="0.05 -0.038 -0.005" euler="25 -30 -40">
+        <joint name="a_th_cmc" type="hinge" axis="0 0 1" range="-20 50"/>
+        <geom name="a_th_cmc_g" type="capsule" fromto="0 0 0 0.022 0 0" size="0.014" material="mat_thumb_a"/>
+
+        <body name="a_thumb_prox" pos="0.022 0 0">
+          <joint name="a_th_mcp" type="hinge" axis="0 1 0" range="-10 65"/>
+          <geom name="a_th_prox_g" type="capsule" fromto="0 0 0 0.030 0 0" size="0.013" material="mat_thumb_a"/>
+
+          <body name="a_thumb_dist" pos="0.030 0 0">
+            <joint name="a_th_ip" type="hinge" axis="0 1 0" range="-5 80"/>
+            <geom name="a_th_dist_g" type="capsule" fromto="0 0 0 0.026 0 0" size="0.011" material="mat_thumb_a"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- 검지 (3-DoF) -->
+      <body name="a_idx_prox" pos="0.075 -0.022 0">
+        <joint name="a_idx_mcp" type="hinge" axis="0 1 0" range="-10 85"/>
+        <geom name="a_idx_p_g" type="capsule" fromto="0 0 0 0.040 0 0" size="0.012" material="mat_finger_a"/>
+        <body name="a_idx_mid" pos="0.040 0 0">
+          <joint name="a_idx_pip" type="hinge" axis="0 1 0" range="0 95"/>
+          <geom name="a_idx_m_g" type="capsule" fromto="0 0 0 0.030 0 0" size="0.010" material="mat_finger_a"/>
+          <body name="a_idx_dist" pos="0.030 0 0">
+            <joint name="a_idx_dip" type="hinge" axis="0 1 0" range="0 80"/>
+            <geom name="a_idx_d_g" type="capsule" fromto="0 0 0 0.022 0 0" size="0.009" material="mat_finger_a"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- 중지 (3-DoF) -->
+      <body name="a_mid_prox" pos="0.075 0 0">
+        <joint name="a_mid_mcp" type="hinge" axis="0 1 0" range="-10 85"/>
+        <geom name="a_mid_p_g" type="capsule" fromto="0 0 0 0.044 0 0" size="0.012" material="mat_finger_a"/>
+        <body name="a_mid_mid" pos="0.044 0 0">
+          <joint name="a_mid_pip" type="hinge" axis="0 1 0" range="0 95"/>
+          <geom name="a_mid_m_g" type="capsule" fromto="0 0 0 0.033 0 0" size="0.010" material="mat_finger_a"/>
+          <body name="a_mid_dist" pos="0.033 0 0">
+            <joint name="a_mid_dip" type="hinge" axis="0 1 0" range="0 80"/>
+            <geom name="a_mid_d_g" type="capsule" fromto="0 0 0 0.024 0 0" size="0.009" material="mat_finger_a"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- 약지 (3-DoF) -->
+      <body name="a_rng_prox" pos="0.075 0.022 0">
+        <joint name="a_rng_mcp" type="hinge" axis="0 1 0" range="-10 85"/>
+        <geom name="a_rng_p_g" type="capsule" fromto="0 0 0 0.038 0 0" size="0.011" material="mat_finger_a"/>
+        <body name="a_rng_mid" pos="0.038 0 0">
+          <joint name="a_rng_pip" type="hinge" axis="0 1 0" range="0 95"/>
+          <geom name="a_rng_m_g" type="capsule" fromto="0 0 0 0.028 0 0" size="0.009" material="mat_finger_a"/>
+          <body name="a_rng_dist" pos="0.028 0 0">
+            <joint name="a_rng_dip" type="hinge" axis="0 1 0" range="0 80"/>
+            <geom name="a_rng_d_g" type="capsule" fromto="0 0 0 0.020 0 0" size="0.008" material="mat_finger_a"/>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!-- ================================================================= -->
+    <!-- [로봇 B: 우측 다크 텅스텐 핸드 - Ari/Geminy]                      -->
+    <!-- 180도 회전되어 맞은편에서 악수 결합 대면 배치                     -->
+    <!-- ================================================================= -->
+    <body name="robot_b_wrist" pos="0.085 0 0.26" euler="0 -10 180">
+      <geom name="b_forearm" type="capsule" fromto="-0.08 0 0 0 0 0" size="0.035" material="mat_arm_b"/>
+      <geom name="b_palm" type="box" size="0.040 0.040 0.015" pos="0.035 0 0" material="mat_palm_b"/>
+      <geom name="b_thenar" type="sphere" size="0.020" pos="0.045 -0.032 -0.005" material="mat_palm_b"/>
+
+      <!-- 대립 엄지 (3-DoF) -->
+      <body name="b_thumb_base" pos="0.05 -0.038 -0.005" euler="25 -30 -40">
+        <joint name="b_th_cmc" type="hinge" axis="0 0 1" range="-20 50"/>
+        <geom name="b_th_cmc_g" type="capsule" fromto="0 0 0 0.022 0 0" size="0.014" material="mat_thumb_b"/>
+
+        <body name="b_thumb_prox" pos="0.022 0 0">
+          <joint name="b_th_mcp" type="hinge" axis="0 1 0" range="-10 65"/>
+          <geom name="b_th_prox_g" type="capsule" fromto="0 0 0 0.030 0 0" size="0.013" material="mat_thumb_b"/>
+
+          <body name="b_thumb_dist" pos="0.030 0 0">
+            <joint name="b_th_ip" type="hinge" axis="0 1 0" range="-5 80"/>
+            <geom name="b_th_dist_g" type="capsule" fromto="0 0 0 0.026 0 0" size="0.011" material="mat_thumb_b"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- 검지 (3-DoF) -->
+      <body name="b_idx_prox" pos="0.075 -0.022 0">
+        <joint name="b_idx_mcp" type="hinge" axis="0 1 0" range="-10 85"/>
+        <geom name="b_idx_p_g" type="capsule" fromto="0 0 0 0.040 0 0" size="0.012" material="mat_finger_b"/>
+        <body name="b_idx_mid" pos="0.040 0 0">
+          <joint name="b_idx_pip" type="hinge" axis="0 1 0" range="0 95"/>
+          <geom name="b_idx_m_g" type="capsule" fromto="0 0 0 0.030 0 0" size="0.010" material="mat_finger_b"/>
+          <body name="b_idx_dist" pos="0.030 0 0">
+            <joint name="b_idx_dip" type="hinge" axis="0 1 0" range="0 80"/>
+            <geom name="b_idx_d_g" type="capsule" fromto="0 0 0 0.022 0 0" size="0.009" material="mat_finger_b"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- 중지 (3-DoF) -->
+      <body name="b_mid_prox" pos="0.075 0 0">
+        <joint name="b_mid_mcp" type="hinge" axis="0 1 0" range="-10 85"/>
+        <geom name="b_mid_p_g" type="capsule" fromto="0 0 0 0.044 0 0" size="0.012" material="mat_finger_b"/>
+        <body name="b_mid_mid" pos="0.044 0 0">
+          <joint name="b_mid_pip" type="hinge" axis="0 1 0" range="0 95"/>
+          <geom name="b_mid_m_g" type="capsule" fromto="0 0 0 0.033 0 0" size="0.010" material="mat_finger_b"/>
+          <body name="b_mid_dist" pos="0.033 0 0">
+            <joint name="b_mid_dip" type="hinge" axis="0 1 0" range="0 80"/>
+            <geom name="b_mid_d_g" type="capsule" fromto="0 0 0 0.024 0 0" size="0.009" material="mat_finger_b"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- 약지 (3-DoF) -->
+      <body name="b_rng_prox" pos="0.075 0.022 0">
+        <joint name="b_rng_mcp" type="hinge" axis="0 1 0" range="-10 85"/>
+        <geom name="b_rng_p_g" type="capsule" fromto="0 0 0 0.038 0 0" size="0.011" material="mat_finger_b"/>
+        <body name="b_rng_mid" pos="0.038 0 0">
+          <joint name="b_rng_pip" type="hinge" axis="0 1 0" range="0 95"/>
+          <geom name="b_rng_m_g" type="capsule" fromto="0 0 0 0.028 0 0" size="0.009" material="mat_finger_b"/>
+          <body name="b_rng_dist" pos="0.028 0 0">
+            <joint name="b_rng_dip" type="hinge" axis="0 1 0" range="0 80"/>
+            <geom name="b_rng_d_g" type="capsule" fromto="0 0 0 0.020 0 0" size="0.008" material="mat_finger_b"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <!-- ================================================================= -->
+  <!-- 구동기 (총 24-DoF: 양손 각각 12개 관절 독립 제어)                   -->
+  <!-- ================================================================= -->
+  <actuator>
+    <!-- Robot A Actuators -->
+    <position name="act_a_th_cmc" joint="a_th_cmc" ctrlrange="-20 50" kp="25"/>
+    <position name="act_a_th_mcp" joint="a_th_mcp" ctrlrange="-10 65" kp="25"/>
+    <position name="act_a_th_ip"  joint="a_th_ip"  ctrlrange="-5 80"  kp="20"/>
+    <position name="act_a_idx_mcp" joint="a_idx_mcp" ctrlrange="-10 85" kp="20"/>
+    <position name="act_a_idx_pip" joint="a_idx_pip" ctrlrange="0 95"   kp="15"/>
+    <position name="act_a_idx_dip" joint="a_idx_dip" ctrlrange="0 80"   kp="12"/>
+    <position name="act_a_mid_mcp" joint="a_mid_mcp" ctrlrange="-10 85" kp="22"/>
+    <position name="act_a_mid_pip" joint="a_mid_pip" ctrlrange="0 95"   kp="16"/>
+    <position name="act_a_mid_dip" joint="a_mid_dip" ctrlrange="0 80"   kp="12"/>
+    <position name="act_a_rng_mcp" joint="a_rng_mcp" ctrlrange="-10 85" kp="18"/>
+    <position name="act_a_rng_pip" joint="a_rng_pip" ctrlrange="0 95"   kp="14"/>
+    <position name="act_a_rng_dip" joint="a_rng_dip" ctrlrange="0 80"   kp="10"/>
+
+    <!-- Robot B Actuators -->
+    <position name="act_b_th_cmc" joint="b_th_cmc" ctrlrange="-20 50" kp="25"/>
+    <position name="act_b_th_mcp" joint="b_th_mcp" ctrlrange="-10 65" kp="25"/>
+    <position name="act_b_th_ip"  joint="b_th_ip"  ctrlrange="-5 80"  kp="20"/>
+    <position name="act_b_idx_mcp" joint="b_idx_mcp" ctrlrange="-10 85" kp="20"/>
+    <position name="act_b_idx_pip" joint="b_idx_pip" ctrlrange="0 95"   kp="15"/>
+    <position name="act_b_idx_dip" joint="b_idx_dip" ctrlrange="0 80"   kp="12"/>
+    <position name="act_b_mid_mcp" joint="b_mid_mcp" ctrlrange="-10 85" kp="22"/>
+    <position name="act_b_mid_pip" joint="b_mid_pip" ctrlrange="0 95"   kp="16"/>
+    <position name="act_b_mid_dip" joint="b_mid_dip" ctrlrange="0 80"   kp="12"/>
+    <position name="act_b_rng_mcp" joint="b_rng_mcp" ctrlrange="-10 85" kp="18"/>
+    <position name="act_b_rng_pip" joint="b_rng_pip" ctrlrange="0 95"   kp="14"/>
+    <position name="act_b_rng_dip" joint="b_rng_dip" ctrlrange="0 80"   kp="10"/>
+  </actuator>
+</mujoco>

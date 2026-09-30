@@ -1,0 +1,220 @@
+<mujoco model="gravity_verified_handshake_v6">
+  <compiler angle="radian" autolimits="true" />
+  <option timestep=".002" gravity="0 0 -9.81" integrator="implicitfast" cone="elliptic" solver="Newton" iterations="100" tolerance="1e-10" />
+  <visual>
+    <global offwidth="1280" offheight="720" />
+    <quality shadowsize="2048" />
+    <headlight ambient=".35 .35 .35" diffuse=".7 .7 .7" />
+  </visual>
+  <default>
+    <joint damping=".035" armature=".0002" limited="true" />
+    <geom friction="1.0 .003 .0001" condim="4" solref=".012 1" solimp=".95 .99 .001" density="650" />
+  </default>
+  <asset>
+    <texture name="floor_tex" type="2d" builtin="checker" width="512" height="512" rgb1=".16 .20 .26" rgb2=".20 .25 .31" />
+    <material name="floor_mat" texture="floor_tex" texrepeat="8 8" reflectance=".12" />
+  </asset>
+  <worldbody>
+    <light pos="-.5 -1 2" dir=".2 .4 -1" diffuse=".8 .8 .8" />
+    <light pos=".6 1 1.8" dir="-.2 -.5 -1" diffuse=".6 .6 .6" />
+    <geom name="floor" type="plane" size="2 2 .1" material="floor_mat" contype="4" conaffinity="3" />
+    <body name="a_wrist" pos="-0.16 -0.022 .60" quat="1 0 0 0">
+      <joint name="a_wrist_x" type="slide" axis="1 0 0" range="-.02 .12" damping="18" armature=".1" />
+      <joint name="a_wrist_y" type="slide" axis="0 1 0" range="-.025 .025" damping="18" armature=".1" />
+      <joint name="a_wrist_z" type="slide" axis="0 0 1" range="-.06 .06" damping="18" armature=".1" />
+      <geom name="a_palm" type="box" pos=".040 0 0" size=".040 .012 .044" rgba=".88 .91 .95 1" contype="1" conaffinity="6" mass=".20" />
+      <geom name="a_forearm" type="capsule" fromto="-.15 0 0 -.025 0 0" size=".026" rgba=".88 .91 .95 1" contype="0" conaffinity="0" mass=".25" />
+      <geom name="a_wrist_cuff" type="cylinder" pos="-.015 0 0" euler="0 1.57079632679 0" size=".033 .018" rgba=".18 .23 .28 1" contype="0" conaffinity="0" mass=".08" />
+      <body name="a_index_mcp_body" pos=".080 0 0.032">
+        <joint name="a_index_mcp" type="hinge" axis="0 0 1" range="-.15 1.65" />
+        <geom name="a_index_mcp_geom" type="capsule" fromto="0 0 0 0.04704 0 0" size="0.008" rgba=".88 .91 .95 1" contype="1" conaffinity="6" mass=".018" />
+        <geom type="sphere" size="0.008320000000000001" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+        <body name="a_index_pip_body" pos="0.04704 0 0">
+          <joint name="a_index_pip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+          <geom name="a_index_pip_geom" type="capsule" fromto="0 0 0 0.029759999999999998 0 0" size="0.007" rgba=".88 .91 .95 1" contype="1" conaffinity="6" mass=".018" />
+          <geom type="sphere" size="0.00728" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          <body name="a_index_dip_body" pos="0.029759999999999998 0 0">
+            <joint name="a_index_dip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+            <geom name="a_index_dip_geom" type="capsule" fromto="0 0 0 0.021119999999999996 0 0" size="0.0065" rgba=".13 .18 .22 1" contype="1" conaffinity="6" mass=".018" />
+            <geom type="sphere" size="0.0067599999999999995" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          </body>
+        </body>
+      </body>
+      <body name="a_middle_mcp_body" pos=".080 0 0.01">
+        <joint name="a_middle_mcp" type="hinge" axis="0 0 1" range="-.15 1.65" />
+        <geom name="a_middle_mcp_geom" type="capsule" fromto="0 0 0 0.049 0 0" size="0.008" rgba=".88 .91 .95 1" contype="1" conaffinity="6" mass=".018" />
+        <geom type="sphere" size="0.008320000000000001" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+        <body name="a_middle_pip_body" pos="0.049 0 0">
+          <joint name="a_middle_pip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+          <geom name="a_middle_pip_geom" type="capsule" fromto="0 0 0 0.031 0 0" size="0.007" rgba=".88 .91 .95 1" contype="1" conaffinity="6" mass=".018" />
+          <geom type="sphere" size="0.00728" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          <body name="a_middle_dip_body" pos="0.031 0 0">
+            <joint name="a_middle_dip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+            <geom name="a_middle_dip_geom" type="capsule" fromto="0 0 0 0.022 0 0" size="0.0065" rgba=".13 .18 .22 1" contype="1" conaffinity="6" mass=".018" />
+            <geom type="sphere" size="0.0067599999999999995" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          </body>
+        </body>
+      </body>
+      <body name="a_ring_mcp_body" pos=".080 0 -0.012">
+        <joint name="a_ring_mcp" type="hinge" axis="0 0 1" range="-.15 1.65" />
+        <geom name="a_ring_mcp_geom" type="capsule" fromto="0 0 0 0.04704 0 0" size="0.008" rgba=".88 .91 .95 1" contype="1" conaffinity="6" mass=".018" />
+        <geom type="sphere" size="0.008320000000000001" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+        <body name="a_ring_pip_body" pos="0.04704 0 0">
+          <joint name="a_ring_pip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+          <geom name="a_ring_pip_geom" type="capsule" fromto="0 0 0 0.029759999999999998 0 0" size="0.007" rgba=".88 .91 .95 1" contype="1" conaffinity="6" mass=".018" />
+          <geom type="sphere" size="0.00728" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          <body name="a_ring_dip_body" pos="0.029759999999999998 0 0">
+            <joint name="a_ring_dip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+            <geom name="a_ring_dip_geom" type="capsule" fromto="0 0 0 0.021119999999999996 0 0" size="0.0065" rgba=".13 .18 .22 1" contype="1" conaffinity="6" mass=".018" />
+            <geom type="sphere" size="0.0067599999999999995" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          </body>
+        </body>
+      </body>
+      <body name="a_little_mcp_body" pos=".080 0 -0.033">
+        <joint name="a_little_mcp" type="hinge" axis="0 0 1" range="-.15 1.65" />
+        <geom name="a_little_mcp_geom" type="capsule" fromto="0 0 0 0.042140000000000004 0 0" size="0.008" rgba=".88 .91 .95 1" contype="1" conaffinity="6" mass=".018" />
+        <geom type="sphere" size="0.008320000000000001" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+        <body name="a_little_pip_body" pos="0.042140000000000004 0 0">
+          <joint name="a_little_pip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+          <geom name="a_little_pip_geom" type="capsule" fromto="0 0 0 0.02666 0 0" size="0.007" rgba=".88 .91 .95 1" contype="1" conaffinity="6" mass=".018" />
+          <geom type="sphere" size="0.00728" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          <body name="a_little_dip_body" pos="0.02666 0 0">
+            <joint name="a_little_dip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+            <geom name="a_little_dip_geom" type="capsule" fromto="0 0 0 0.01892 0 0" size="0.0065" rgba=".13 .18 .22 1" contype="1" conaffinity="6" mass=".018" />
+            <geom type="sphere" size="0.0067599999999999995" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          </body>
+        </body>
+      </body>
+      <body name="a_thumb_cmc_body" pos=".028 0 .058">
+        <joint name="a_thumb_cmc" type="hinge" axis="0 0 1" range="-.3 1.4" />
+        <geom name="a_thumb_cmc_geom" type="capsule" fromto="0 0 0 0.027 0 0" size=".0085" rgba=".88 .91 .95 1" contype="1" conaffinity="6" mass=".025" />
+        <body name="a_thumb_mcp_body" pos="0.027 0 0">
+          <joint name="a_thumb_mcp" type="hinge" axis="0 1 0" range="-.3 1.4" />
+          <geom name="a_thumb_mcp_geom" type="capsule" fromto="0 0 0 0.026 0 0" size=".0085" rgba=".88 .91 .95 1" contype="1" conaffinity="6" mass=".025" />
+          <body name="a_thumb_ip_body" pos="0.026 0 0">
+            <joint name="a_thumb_ip" type="hinge" axis="0 1 0" range="-.3 1.4" />
+            <geom name="a_thumb_ip_geom" type="capsule" fromto="0 0 0 0.022 0 0" size=".0085" rgba=".13 .18 .22 1" contype="1" conaffinity="6" mass=".025" />
+          </body>
+        </body>
+      </body>
+    </body>
+    <body name="b_wrist" pos="0.16 0.022 .60" quat="0 0 0 1">
+      <joint name="b_wrist_x" type="slide" axis="1 0 0" range="-.02 .12" damping="18" armature=".1" />
+      <joint name="b_wrist_y" type="slide" axis="0 1 0" range="-.025 .025" damping="18" armature=".1" />
+      <joint name="b_wrist_z" type="slide" axis="0 0 1" range="-.06 .06" damping="18" armature=".1" />
+      <geom name="b_palm" type="box" pos=".040 0 0" size=".040 .012 .044" rgba=".30 .37 .46 1" contype="2" conaffinity="5" mass=".20" />
+      <geom name="b_forearm" type="capsule" fromto="-.15 0 0 -.025 0 0" size=".026" rgba=".30 .37 .46 1" contype="0" conaffinity="0" mass=".25" />
+      <geom name="b_wrist_cuff" type="cylinder" pos="-.015 0 0" euler="0 1.57079632679 0" size=".033 .018" rgba=".18 .23 .28 1" contype="0" conaffinity="0" mass=".08" />
+      <body name="b_index_mcp_body" pos=".080 0 0.032">
+        <joint name="b_index_mcp" type="hinge" axis="0 0 1" range="-.15 1.65" />
+        <geom name="b_index_mcp_geom" type="capsule" fromto="0 0 0 0.04704 0 0" size="0.008" rgba=".30 .37 .46 1" contype="2" conaffinity="5" mass=".018" />
+        <geom type="sphere" size="0.008320000000000001" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+        <body name="b_index_pip_body" pos="0.04704 0 0">
+          <joint name="b_index_pip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+          <geom name="b_index_pip_geom" type="capsule" fromto="0 0 0 0.029759999999999998 0 0" size="0.007" rgba=".30 .37 .46 1" contype="2" conaffinity="5" mass=".018" />
+          <geom type="sphere" size="0.00728" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          <body name="b_index_dip_body" pos="0.029759999999999998 0 0">
+            <joint name="b_index_dip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+            <geom name="b_index_dip_geom" type="capsule" fromto="0 0 0 0.021119999999999996 0 0" size="0.0065" rgba=".13 .18 .22 1" contype="2" conaffinity="5" mass=".018" />
+            <geom type="sphere" size="0.0067599999999999995" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          </body>
+        </body>
+      </body>
+      <body name="b_middle_mcp_body" pos=".080 0 0.01">
+        <joint name="b_middle_mcp" type="hinge" axis="0 0 1" range="-.15 1.65" />
+        <geom name="b_middle_mcp_geom" type="capsule" fromto="0 0 0 0.049 0 0" size="0.008" rgba=".30 .37 .46 1" contype="2" conaffinity="5" mass=".018" />
+        <geom type="sphere" size="0.008320000000000001" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+        <body name="b_middle_pip_body" pos="0.049 0 0">
+          <joint name="b_middle_pip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+          <geom name="b_middle_pip_geom" type="capsule" fromto="0 0 0 0.031 0 0" size="0.007" rgba=".30 .37 .46 1" contype="2" conaffinity="5" mass=".018" />
+          <geom type="sphere" size="0.00728" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          <body name="b_middle_dip_body" pos="0.031 0 0">
+            <joint name="b_middle_dip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+            <geom name="b_middle_dip_geom" type="capsule" fromto="0 0 0 0.022 0 0" size="0.0065" rgba=".13 .18 .22 1" contype="2" conaffinity="5" mass=".018" />
+            <geom type="sphere" size="0.0067599999999999995" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          </body>
+        </body>
+      </body>
+      <body name="b_ring_mcp_body" pos=".080 0 -0.012">
+        <joint name="b_ring_mcp" type="hinge" axis="0 0 1" range="-.15 1.65" />
+        <geom name="b_ring_mcp_geom" type="capsule" fromto="0 0 0 0.04704 0 0" size="0.008" rgba=".30 .37 .46 1" contype="2" conaffinity="5" mass=".018" />
+        <geom type="sphere" size="0.008320000000000001" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+        <body name="b_ring_pip_body" pos="0.04704 0 0">
+          <joint name="b_ring_pip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+          <geom name="b_ring_pip_geom" type="capsule" fromto="0 0 0 0.029759999999999998 0 0" size="0.007" rgba=".30 .37 .46 1" contype="2" conaffinity="5" mass=".018" />
+          <geom type="sphere" size="0.00728" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          <body name="b_ring_dip_body" pos="0.029759999999999998 0 0">
+            <joint name="b_ring_dip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+            <geom name="b_ring_dip_geom" type="capsule" fromto="0 0 0 0.021119999999999996 0 0" size="0.0065" rgba=".13 .18 .22 1" contype="2" conaffinity="5" mass=".018" />
+            <geom type="sphere" size="0.0067599999999999995" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          </body>
+        </body>
+      </body>
+      <body name="b_little_mcp_body" pos=".080 0 -0.033">
+        <joint name="b_little_mcp" type="hinge" axis="0 0 1" range="-.15 1.65" />
+        <geom name="b_little_mcp_geom" type="capsule" fromto="0 0 0 0.042140000000000004 0 0" size="0.008" rgba=".30 .37 .46 1" contype="2" conaffinity="5" mass=".018" />
+        <geom type="sphere" size="0.008320000000000001" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+        <body name="b_little_pip_body" pos="0.042140000000000004 0 0">
+          <joint name="b_little_pip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+          <geom name="b_little_pip_geom" type="capsule" fromto="0 0 0 0.02666 0 0" size="0.007" rgba=".30 .37 .46 1" contype="2" conaffinity="5" mass=".018" />
+          <geom type="sphere" size="0.00728" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          <body name="b_little_dip_body" pos="0.02666 0 0">
+            <joint name="b_little_dip" type="hinge" axis="0 0 1" range="-.15 1.65" />
+            <geom name="b_little_dip_geom" type="capsule" fromto="0 0 0 0.01892 0 0" size="0.0065" rgba=".13 .18 .22 1" contype="2" conaffinity="5" mass=".018" />
+            <geom type="sphere" size="0.0067599999999999995" rgba=".65 .49 .29 1" contype="0" conaffinity="0" mass=".001" />
+          </body>
+        </body>
+      </body>
+      <body name="b_thumb_cmc_body" pos=".028 0 .058">
+        <joint name="b_thumb_cmc" type="hinge" axis="0 0 1" range="-.3 1.4" />
+        <geom name="b_thumb_cmc_geom" type="capsule" fromto="0 0 0 0.027 0 0" size=".0085" rgba=".30 .37 .46 1" contype="2" conaffinity="5" mass=".025" />
+        <body name="b_thumb_mcp_body" pos="0.027 0 0">
+          <joint name="b_thumb_mcp" type="hinge" axis="0 1 0" range="-.3 1.4" />
+          <geom name="b_thumb_mcp_geom" type="capsule" fromto="0 0 0 0.026 0 0" size=".0085" rgba=".30 .37 .46 1" contype="2" conaffinity="5" mass=".025" />
+          <body name="b_thumb_ip_body" pos="0.026 0 0">
+            <joint name="b_thumb_ip" type="hinge" axis="0 1 0" range="-.3 1.4" />
+            <geom name="b_thumb_ip_geom" type="capsule" fromto="0 0 0 0.022 0 0" size=".0085" rgba=".13 .18 .22 1" contype="2" conaffinity="5" mass=".025" />
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <position name="a_wrist_x" joint="a_wrist_x" kp="1200" kv="55" ctrlrange="-.02 .12" forcerange="-100 100" />
+    <position name="a_wrist_y" joint="a_wrist_y" kp="1200" kv="55" ctrlrange="-.025 .025" forcerange="-100 100" />
+    <position name="a_wrist_z" joint="a_wrist_z" kp="1200" kv="55" ctrlrange="-.06 .06" forcerange="-100 100" />
+    <position name="a_index_mcp" joint="a_index_mcp" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="a_index_pip" joint="a_index_pip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="a_index_dip" joint="a_index_dip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="a_middle_mcp" joint="a_middle_mcp" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="a_middle_pip" joint="a_middle_pip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="a_middle_dip" joint="a_middle_dip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="a_ring_mcp" joint="a_ring_mcp" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="a_ring_pip" joint="a_ring_pip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="a_ring_dip" joint="a_ring_dip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="a_little_mcp" joint="a_little_mcp" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="a_little_pip" joint="a_little_pip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="a_little_dip" joint="a_little_dip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="a_thumb_cmc" joint="a_thumb_cmc" kp="1.0" kv=".04" ctrlrange="-.3 1.4" forcerange="-.25 .25" />
+    <position name="a_thumb_mcp" joint="a_thumb_mcp" kp="1.0" kv=".04" ctrlrange="-.3 1.4" forcerange="-.25 .25" />
+    <position name="a_thumb_ip" joint="a_thumb_ip" kp="1.0" kv=".04" ctrlrange="-.3 1.4" forcerange="-.25 .25" />
+    <position name="b_wrist_x" joint="b_wrist_x" kp="1200" kv="55" ctrlrange="-.02 .12" forcerange="-100 100" />
+    <position name="b_wrist_y" joint="b_wrist_y" kp="1200" kv="55" ctrlrange="-.025 .025" forcerange="-100 100" />
+    <position name="b_wrist_z" joint="b_wrist_z" kp="1200" kv="55" ctrlrange="-.06 .06" forcerange="-100 100" />
+    <position name="b_index_mcp" joint="b_index_mcp" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="b_index_pip" joint="b_index_pip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="b_index_dip" joint="b_index_dip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="b_middle_mcp" joint="b_middle_mcp" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="b_middle_pip" joint="b_middle_pip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="b_middle_dip" joint="b_middle_dip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="b_ring_mcp" joint="b_ring_mcp" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="b_ring_pip" joint="b_ring_pip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="b_ring_dip" joint="b_ring_dip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="b_little_mcp" joint="b_little_mcp" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="b_little_pip" joint="b_little_pip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="b_little_dip" joint="b_little_dip" kp="1.2" kv=".045" ctrlrange="-.15 1.65" forcerange="-.35 .35" />
+    <position name="b_thumb_cmc" joint="b_thumb_cmc" kp="1.0" kv=".04" ctrlrange="-.3 1.4" forcerange="-.25 .25" />
+    <position name="b_thumb_mcp" joint="b_thumb_mcp" kp="1.0" kv=".04" ctrlrange="-.3 1.4" forcerange="-.25 .25" />
+    <position name="b_thumb_ip" joint="b_thumb_ip" kp="1.0" kv=".04" ctrlrange="-.3 1.4" forcerange="-.25 .25" />
+  </actuator>
+</mujoco>
