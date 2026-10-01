@@ -8,11 +8,29 @@ import numpy as np
 import time
 import trimesh
 import gc
+import http.server
+import socketserver
+import threading
 
 URDF_PATH = "/home/moos/dev_ws/dual_arms/urdf/dual_openarm.xml"
 MESH_DIR  = "/home/moos/dev_ws/dual_arms/meshes/"
+WEB_DIR   = "/home/moos/dev_ws/dual_arms/web/rerun"
 
 ROBOT_ROOT = "world/robot_v4"
+
+class AutoConnectHTTPHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=WEB_DIR, **kwargs)
+
+    def log_message(self, format, *args):
+        pass  # Suppress verbose access logs
+
+def start_web_viewer(port=9090):
+    socketserver.TCPServer.allow_reuse_address = True
+    server = socketserver.TCPServer(("0.0.0.0", port), AutoConnectHTTPHandler)
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    return server
 
 OFFSETS_LEFT = {
     "base_link": 0, "link1": 62.5, "link2": 121.5, "link3": 188.0,
@@ -38,8 +56,13 @@ def run_sim():
 
     rr.init("OpenArm_WowRobo_V4", spawn=False)
     server_uri = rr.serve_grpc(grpc_port=9876, server_memory_limit="1GB")
-    rr.serve_web_viewer(web_port=9090, connect_to=server_uri)
-    print("Dual-arm sim started (EGL GPU rendering) on http://localhost:9090")
+    if os.path.exists(os.path.join(WEB_DIR, "re_viewer_bg.wasm")):
+        start_web_viewer(port=9090)
+    else:
+        rr.serve_web_viewer(web_port=9090, connect_to=server_uri)
+    print("Dual-arm sim started (EGL GPU rendering)")
+    print("Auto-connecting Web Viewer: http://hb5u.hyperbook.com:9090")
+    print(f"Direct gRPC Proxy URI: {server_uri}")
 
     # --- Blueprint 설정: 3D 로봇 뷰어를 기본 중앙 화면으로 강제 배치 ---
     blueprint = rrb.Blueprint(
@@ -255,33 +278,33 @@ def run_sim():
             rr.log("world/skeleton/torso", rr.LineStrips3D([[body_positions["base_plate"], body_positions["shoulder_block"]]],
                                                          colors=[[200, 200, 200]], radii=[0.02]))
 
-        # 90프레임마다 메쉬 재송신 (신규 웹 접속자가 언제 들어와도 메쉬가 즉시 나타나도록 보장)
-        if frame > 0 and frame % 90 == 0:
-            log_robot_meshes(is_static=False)
+        # 메쉬는 최초 static=True로 gRPC 버퍼에 상주하므로 주기적 재전송 불필요 (네트워크 병목 및 렉 제거)
 
-        # GPU EGL 카메라 렌더링
+        # GPU EGL 카메라 렌더링 (RTX 5060 하드웨어 가속)
         if frame % CAM_RENDER_EVERY == 0:
             mujoco.mj_fwdPosition(model, data)
 
             renderer_top.update_scene(data, camera="cam_top")
             img = renderer_top.render()
-            rr.log("cameras/top", rr.Image(img).compress(jpeg_quality=75))
+            rr.log("cameras/top", rr.Image(img).compress(jpeg_quality=65))
             del img
 
             renderer_front.update_scene(data, camera="cam_front")
             img = renderer_front.render()
-            rr.log("cameras/front", rr.Image(img).compress(jpeg_quality=75))
+            rr.log("cameras/front", rr.Image(img).compress(jpeg_quality=65))
             del img
 
-            renderer_lw.update_scene(data, camera="cam_left_wrist")
-            img = renderer_lw.render()
-            rr.log("cameras/left_wrist", rr.Image(img).compress(jpeg_quality=75))
-            del img
+            # 손목 카메라는 대역폭 절약을 위해 6프레임마다 렌더
+            if frame % (CAM_RENDER_EVERY * 2) == 0:
+                renderer_lw.update_scene(data, camera="cam_left_wrist")
+                img = renderer_lw.render()
+                rr.log("cameras/left_wrist", rr.Image(img).compress(jpeg_quality=60))
+                del img
 
-            renderer_rw.update_scene(data, camera="cam_right_wrist")
-            img = renderer_rw.render()
-            rr.log("cameras/right_wrist", rr.Image(img).compress(jpeg_quality=75))
-            del img
+                renderer_rw.update_scene(data, camera="cam_right_wrist")
+                img = renderer_rw.render()
+                rr.log("cameras/right_wrist", rr.Image(img).compress(jpeg_quality=60))
+                del img
 
         # 300프레임마다 GC 강제 실행
         if frame % 300 == 0:
