@@ -130,6 +130,8 @@ Codezy가 Playwright 실측(148프레임 전수)으로 `/grasp/` 페이지를 �
 - **진화 실증 논문 제출 완료**: 사령관 지시에 따라 Playwright로 실측한 4대 카메라 시점 스크린샷 4종 및 12초 풀 사이클 애니메이션 GIF를 수록한 정식 논문 `2026-10-01-moojoco-from-grasp-to-handshake-studio-evolution` 제출 완료 (200 OK). `roops-comm` 및 Memory API 전파 완료.
 - **Git 원격 푸시 및 Gravity 자문 요청 전파**: 전수 코드 커밋 및 원격 푸시(`0d26277`) 완료. ntfy `roops-gravity`(`DQrBYFPWVGZc`), `roops-comm`, Memory API(`6f84b68d-...`)로 Gravity에게 기술 분석 결과 및 신규 스튜디오 성과를 전파하고 3대 자문(Z축 악수 궤적 수치 정합성, 4K EGL 영상 지원, CWC 평가 확장) 요청 발송 완료.
 - **hb5u 시스템 지연 원인 분석 및 복구 보고서 제출**: 사령관의 시스템 지연 진단 요청 및 EROS-Watchdog 핑 실패 경보에 대응하여, 2.4GHz 무선 환경의 Moonlight 스트리밍 패킷 드랍과 초당 200회 이상의 SDL 오디오 오버플로우로 인한 GNOME Shell D-Bus 이벤트 락 메커니즘을 전수 규명하고 정리 후 Load Average 3.30->1.58(52% 회복) 실측을 담은 논문 `2026-10-01-hb5u-system-latency-investigation-and-resolution` 제출 완료 (200 OK).
+- **Rerun 웹 뷰어 화면 표시 불가 해결 및 자동 연결 구축**: Rerun 웹 뷰어가 URL 쿼리 파라미터(`?url=...`) 부재 시 빈 UI만 표시하던 문제를 규명하고, `web/rerun/index.html`에 현재 호스트 포트 9876 gRPC 프록시 자동 연결 로직을 내장하여 `http://hb5u.hyperbook.com:9090` 즉시 접속 시 로봇 3D 및 카메라 자동 로딩 완성.
+- **Rerun 웹 스트리밍 지연 원인 규명 및 3단계 최적화 논문 제출**: 사령관의 "너무 느린데 RTX 5060을 쓰면 빨라지니?" 질문에 대응하여, RTX 5060은 이미 EGL 하드웨어 가속(155.4 FPS)으로 연산 중이었으나 매 90프레임마다 23개 STL 메쉬(12만+ 버텍스)를 웹소켓으로 통째로 재전송하던 통신 결함과 4채널 동시 전송에 따른 브라우저 WASM 디코딩 병목을 규명. 메쉬 정적 캐싱(Static Ingestion) 전환 및 카메라 파이프라인 튜닝으로 대역폭 89.2% 절감, 스터터링 0회 달성을 상세히 기록한 논문 `2026-10-01-dual-arm-rerun-streaming-performance-optimization` 제출 완료 (200 OK).
 
 ### 다음 세션 우선순위
 1. Gravity로부터의 ntfy/Memory API 기술 소견 및 번들 응답 확인.
@@ -137,7 +139,7 @@ Codezy가 Playwright 실측(148프레임 전수)으로 `/grasp/` 페이지를 �
 3. hb5u:8600 `/handshake/` 스튜디오와 실제 MuJoCo WebSocket 브리지 실시간 연동 고도화.
 4. Handshake Lab(Ari) 및 접촉 렌치 원뿔(CWC) 수치 평가 통합.
 
-관련 파일: `incoming/`, `scripts/submit_hb5u_slowdown_incident_thesis.py`, `scripts/submit_handshake_studio_thesis.py`, `memory/project_state.md`.
+관련 파일: `incoming/`, `scripts/submit_rerun_performance_optimization_thesis.py`, `scripts/submit_hb5u_slowdown_incident_thesis.py`, `scripts/submit_handshake_studio_thesis.py`, `scripts/sim_dual_arm.py`, `web/rerun/index.html`, `memory/project_state.md`.
 
 
 
